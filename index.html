@@ -35,7 +35,7 @@ button.primary{background:#785a27;border-color:#c99b45;color:#fff}button.danger{
 "use strict";
 var canvas=document.getElementById('game'),ctx=canvas.getContext('2d'),stage=document.getElementById('stage');
 var W=1500,H=1000,scale=1,ox=0,oy=0,paused=true,speed=1,started=false,gameOver=false,last=0,acc=0,selected=[],placing=null,drag=null;
-var resources={wood:300,ore:220,oil:100},enemyResources={wood:300,ore:220,oil:100},rallyPoints={p:null,e:null},popCap=30,units=[],buildings=[],nodes=[],bullets=[],effects=[],nextId=1,elapsed=0,aiTimer=0,spawnTimer=0;
+var resources={wood:600,ore:450,oil:250},enemyResources={wood:600,ore:450,oil:250},rallyPoints={p:null,e:null},popCap=30,units=[],buildings=[],nodes=[],bullets=[],effects=[],nextId=1,elapsed=0,aiTimer=0,spawnTimer=0;
 var ui={wood:document.getElementById('wood'),ore:document.getElementById('ore'),oil:document.getElementById('oil'),pop:document.getElementById('pop'),selection:document.getElementById('selection'),actions:document.getElementById('actions'),log:document.getElementById('log')};
 var defs={
 worker:{name:'工程平民',cost:{wood:50},time:8,hp:55,range:18,damage:4,rate:1.1,speed:65,kind:'worker',pop:1},
@@ -63,16 +63,16 @@ function makeUnit(team,type,x,y){var d=defs[type],u={id:nextId++,team:team,kind:
 function makeBuilding(team,type,x,y){var d=buildingDefs[type],b={id:nextId++,team:team,kind:'building',type:type,x:x,y:y,hp:d.hp,max:d.hp,queue:[],progress:0,active:true};buildings.push(b);return b}
 function node(type,x,y,amount){nodes.push({type:type,x:x,y:y,amount:amount,max:amount})}
 function init(){
-resources={wood:300,ore:220,oil:100};enemyResources={wood:300,ore:220,oil:100};rallyPoints={p:null,e:null};units=[];buildings=[];nodes=[];bullets=[];effects=[];nextId=1;elapsed=0;aiTimer=0;spawnTimer=0;gameOver=false;selected=[];placing=null;popCap=30;
+resources={wood:600,ore:450,oil:250};enemyResources={wood:600,ore:450,oil:250};rallyPoints={p:null,e:null};units=[];buildings=[];nodes=[];bullets=[];effects=[];nextId=1;elapsed=0;aiTimer=0;spawnTimer=0;gameOver=false;selected=[];placing=null;popCap=30;
 makeBuilding('p','hq',245,500);makeBuilding('p','barracks',365,425);
 for(var i=0;i<4;i++)makeUnit('p','worker',320+i*22,565+(i%2)*20);
 makeUnit('p','rifle',420,510);
 makeBuilding('e','hq',1250,500);makeBuilding('e','barracks',1135,420);makeBuilding('e','factory',1130,580);makeBuilding('e','fort',1030,500);
 for(var i=0;i<4;i++)makeUnit('e','worker',1160+i*18,650+(i%2)*20);
 for(var i=0;i<5;i++)makeUnit('e','rifle',1050+i*20,470+(i%2)*20);
-for(var i=0;i<4;i++){node('wood',450+i*55,180+(i%2)*60,900);node('wood',580+i*45,800+(i%2)*35,900)}
-for(var i=0;i<5;i++)node('ore',700+(i%3)*55,260+Math.floor(i/3)*65,1100);
-node('oil',850,760,900);node('oil',930,220,900);
+for(var i=0;i<4;i++){node('wood',450+i*55,180+(i%2)*60,1800);node('wood',580+i*45,800+(i%2)*35,1800)}
+for(var i=0;i<5;i++)node('ore',700+(i%3)*55,260+Math.floor(i/3)*65,2200);
+node('oil',850,760,1800);node('oil',930,220,1800);
 updateUI();log('戰役開始。敵軍基地位於東側，準備擴張。');
 }
 function countPop(team){return units.filter(u=>u.team===team).reduce((a,u)=>a+defs[u.type].pop,0)}
