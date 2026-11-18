@@ -1,0 +1,189 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Frontier Command｜前線指揮官</title>
+<style>
+:root{color-scheme:dark;--bg:#101820;--panel:#1b2833;--line:#344653;--gold:#e5b85c;--cyan:#65c7d8}
+*{box-sizing:border-box}body{margin:0;background:#0d151c;color:#e8edf0;font:14px/1.4 system-ui,"Microsoft JhengHei",sans-serif;overflow:hidden}
+#top{height:54px;background:#17232d;border-bottom:1px solid #344653;display:flex;align-items:center;gap:18px;padding:0 14px}
+.brand{font-weight:900;letter-spacing:1px;color:#f2c66d;font-size:16px}.stat{color:#cbd6dc}.stat b{color:#fff;margin-left:4px;font-variant-numeric:tabular-nums}
+#layout{height:calc(100vh - 54px);display:grid;grid-template-columns:minmax(0,1fr) 280px}
+#stage{position:relative;min-width:0;min-height:0;background:#18251e}canvas{display:block;width:100%;height:100%;cursor:crosshair}
+#side{background:#17232d;border-left:1px solid #344653;display:flex;flex-direction:column;min-height:0}
+.panel{padding:12px;border-bottom:1px solid #344653}.panel h3{margin:0 0 9px;font-size:12px;letter-spacing:1px;color:#90a8b5;text-transform:uppercase}
+.actions{display:grid;grid-template-columns:1fr 1fr;gap:7px}
+button{background:#263946;color:#eaf0f3;border:1px solid #425866;border-radius:6px;padding:9px 7px;font-weight:700;cursor:pointer;font-size:12px}
+button:hover{background:#345064;border-color:#65c7d8}button:disabled{opacity:.35;cursor:not-allowed}
+button.primary{background:#785a27;border-color:#c99b45;color:#fff}button.danger{background:#552f30;border-color:#87494b}
+#selection{min-height:68px;color:#d9e2e7}.muted{color:#91a3ad;font-size:12px}
+#log{overflow:auto;flex:1;padding:10px;font-size:12px;color:#aebdc5}.logline{padding:5px 0;border-bottom:1px solid #263640}
+#hint{position:absolute;left:12px;bottom:12px;background:#101820d9;border:1px solid #536b71;border-radius:7px;padding:8px 11px;color:#c8d7dc;pointer-events:none;font-size:12px}
+#overlay{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;background:#081016d9;z-index:3}
+.modal{width:min(480px,90%);background:#1b2a34;border:1px solid #536b71;border-radius:12px;padding:24px;box-shadow:0 20px 80px #000}
+.modal h1{margin:0 0 8px;color:#f2c66d}.modal p{color:#b8c8d0;line-height:1.7}.modal button{width:100%;padding:13px;font-size:15px;margin-top:8px}
+#pauseTag{position:absolute;top:12px;left:12px;color:#f2c66d;font-weight:900;display:none;text-shadow:0 2px 5px #000}
+@media(max-width:760px){#layout{grid-template-columns:1fr;grid-template-rows:minmax(0,1fr) 220px}#side{border-left:0;border-top:1px solid #344653;display:grid;grid-template-columns:1fr 1fr;grid-template-rows:auto 1fr}#log{max-height:140px}.panel{padding:8px}.actions{grid-template-columns:repeat(3,1fr)}button{padding:7px 4px;font-size:11px}#top{gap:9px;font-size:11px}.brand{font-size:13px}}
+</style>
+</head>
+<body>
+<header id="top"><div class="brand">⚔ FRONTIER COMMAND</div><div class="stat">木材<b id="wood">300</b></div><div class="stat">礦石<b id="ore">220</b></div><div class="stat">石油<b id="oil">100</b></div><div class="stat">人口<b id="pop">5/30</b></div><div style="margin-left:auto;display:flex;gap:6px"><button id="pause">Ⅱ 暫停</button><button id="speed">速度 ×1</button><button id="save">存檔</button><button id="reset" class="danger">重開</button></div></header>
+<div id="layout"><main id="stage"><canvas id="game"></canvas><div id="pauseTag">PAUSED</div><div id="hint">左鍵選取單位／建築　右鍵移動、攻擊或採集　拖曳框選</div><div id="overlay"><div class="modal"><h1>前線指揮官</h1><p>建立你的基地，派遣平民採集木材與礦石，擴建兵營和戰車工廠，組成軍隊摧毀敵方堡壘。敵軍會持續發展並主動進攻。</p><p>勝利條件：摧毀敵方主堡與所有敵方堡壘。保護你的主堡，失去主堡將直接戰敗。</p><button id="start" class="primary">開始戰役</button></div></div></main>
+<aside id="side"><section class="panel"><h3>指揮選單</h3><div id="selection">尚未選取單位。<div class="muted">選取平民後可建造設施；選取軍隊後可下達攻擊命令。</div></div></section><section class="panel"><h3>建造／生產</h3><div class="actions" id="actions"></div></section><section class="panel" style="grid-column:1/-1;min-height:0;display:flex;flex-direction:column"><h3>戰場情報</h3><div id="log"></div></section></aside></div>
+<script>
+(function(){
+"use strict";
+var canvas=document.getElementById('game'),ctx=canvas.getContext('2d'),stage=document.getElementById('stage');
+var W=1500,H=1000,scale=1,ox=0,oy=0,paused=true,speed=1,started=false,gameOver=false,last=0,acc=0,selected=[],placing=null,drag=null;
+var resources={wood:300,ore:220,oil:100},popCap=30,units=[],buildings=[],nodes=[],bullets=[],effects=[],nextId=1,elapsed=0,aiTimer=0,spawnTimer=0;
+var ui={wood:document.getElementById('wood'),ore:document.getElementById('ore'),oil:document.getElementById('oil'),pop:document.getElementById('pop'),selection:document.getElementById('selection'),actions:document.getElementById('actions'),log:document.getElementById('log')};
+var defs={
+worker:{name:'工程平民',cost:{wood:50},time:8,hp:55,range:18,damage:4,rate:1.1,speed:65,kind:'worker',pop:1},
+rifle:{name:'步槍兵',cost:{wood:35,ore:15},time:6,hp:75,range:145,damage:10,rate:.8,speed:58,kind:'infantry',pop:1},
+rocket:{name:'火箭兵',cost:{wood:25,ore:45},time:9,hp:62,range:190,damage:28,rate:1.8,speed:48,kind:'anti',pop:1},
+tank:{name:'主力戰車',cost:{ore:100,oil:35},time:15,hp:260,range:175,damage:38,rate:1.5,speed:42,kind:'vehicle',pop:3},
+artillery:{name:'自走火砲',cost:{ore:130,oil:55},time:19,hp:170,range:270,damage:65,rate:3.2,speed:28,kind:'artillery',pop:3}
+};
+var buildingDefs={
+hq:{name:'主堡',cost:{},hp:1300,w:90,h:78,kind:'hq'},
+barracks:{name:'兵營',cost:{wood:130,ore:50},hp:550,w:72,h:62,kind:'barracks'},
+factory:{name:'戰車工廠',cost:{wood:150,ore:180},hp:700,w:88,h:68,kind:'factory'},
+lumber:{name:'伐木場',cost:{wood:90},hp:320,w:58,h:52,kind:'lumber'},
+mine:{name:'採礦站',cost:{wood:100,ore:35},hp:360,w:58,h:52,kind:'mine'},
+power:{name:'發電廠',cost:{wood:90,ore:35},hp:300,w:56,h:50,kind:'power'},
+turret:{name:'機槍塔',cost:{wood:80,ore:100},hp:430,w:48,h:48,kind:'turret'},
+fort:{name:'前線堡壘',cost:{wood:160,ore:180},hp:850,w:76,h:68,kind:'fort'}
+};
+function log(s){var d=document.createElement('div');d.className='logline';d.textContent='['+fmt(elapsed)+'] '+s;ui.log.prepend(d);while(ui.log.children.length>30)ui.log.lastChild.remove()}
+function fmt(t){return Math.floor(t/60)+':'+('0'+Math.floor(t%60)).slice(-2)}
+function costText(c){return Object.keys(c).map(k=>({wood:'木',ore:'礦',oil:'油'}[k])+c[k]).join(' ')}
+function canPay(c){return Object.keys(c).every(k=>resources[k]>=c[k])}
+function pay(c){if(!canPay(c))return false;Object.keys(c).forEach(k=>resources[k]-=c[k]);return true}
+function makeUnit(team,type,x,y){var d=defs[type],u={id:nextId++,team:team,type:type,x:x,y:y,hp:d.hp,max:d.hp,order:null,target:null,carry:0,resource:null,cool:Math.random(),buildQueue:[],moving:false};units.push(u);return u}
+function makeBuilding(team,type,x,y){var d=buildingDefs[type],b={id:nextId++,team:team,type:type,x:x,y:y,hp:d.hp,max:d.hp,queue:[],progress:0,active:true};buildings.push(b);return b}
+function node(type,x,y,amount){nodes.push({type:type,x:x,y:y,amount:amount,max:amount})}
+function init(){
+resources={wood:300,ore:220,oil:100};units=[];buildings=[];nodes=[];bullets=[];effects=[];nextId=1;elapsed=0;aiTimer=0;spawnTimer=0;gameOver=false;selected=[];placing=null;popCap=30;
+makeBuilding('p','hq',245,500);makeBuilding('p','barracks',365,425);
+for(var i=0;i<4;i++)makeUnit('p','worker',320+i*22,565+(i%2)*20);
+makeUnit('p','rifle',420,510);
+makeBuilding('e','hq',1250,500);makeBuilding('e','barracks',1135,420);makeBuilding('e','factory',1130,580);makeBuilding('e','fort',1030,500);
+for(var i=0;i<4;i++)makeUnit('e','worker',1160+i*18,650+(i%2)*20);
+for(var i=0;i<5;i++)makeUnit('e','rifle',1050+i*20,470+(i%2)*20);
+for(var i=0;i<4;i++){node('wood',450+i*55,180+(i%2)*60,900);node('wood',580+i*45,800+(i%2)*35,900)}
+for(var i=0;i<5;i++)node('ore',700+(i%3)*55,260+Math.floor(i/3)*65,1100);
+node('oil',850,760,900);node('oil',930,220,900);
+updateUI();log('戰役開始。敵軍基地位於東側，準備擴張。');
+}
+function countPop(team){return units.filter(u=>u.team===team).reduce((a,u)=>a+defs[u.type].pop,0)}
+function myCap(){return 30+buildings.filter(b=>b.team==='p'&&b.type==='hq').length*10+buildings.filter(b=>b.team==='p'&&b.type==='fort').length*5}
+function updateUI(){
+ui.wood.textContent=Math.floor(resources.wood);ui.ore.textContent=Math.floor(resources.ore);ui.oil.textContent=Math.floor(resources.oil);ui.pop.textContent=countPop('p')+'/'+myCap();
+renderActions();renderSelection();
+}
+function renderActions(){
+var b=selected.length===1?selected[0]:null,html='';
+function btn(label,fn,disabled){var el=document.createElement('button');el.textContent=label;el.disabled=!!disabled;el.onclick=fn;ui.actions.appendChild(el)}
+ui.actions.innerHTML='';
+if(placing){btn('取消建造',function(){placing=null;renderActions()});return}
+if(b&&b.team==='p'&&b.kind==='unit'&&b.type==='worker'){
+Object.keys(buildingDefs).filter(k=>k!=='hq').forEach(k=>{var d=buildingDefs[k];btn(d.name+'\n'+costText(d.cost),function(){placing=k;log('選擇建造'+d.name+'：在地圖空地點擊放置。');renderActions()},!canPay(d.cost))});
+}else if(b&&b.team==='p'&&b.kind==='building'){
+if(b.type==='hq'||b.type==='barracks'){btn('生產平民 '+costText(defs.worker.cost),function(){train(b,'worker')},!canPay(defs.worker.cost)||countPop('p')>=myCap());}
+if(b.type==='barracks'){['rifle','rocket'].forEach(k=>btn(defs[k].name+' '+costText(defs[k].cost),function(){train(b,k)},!canPay(defs[k].cost)||countPop('p')>=myCap()))}
+if(b.type==='factory'){['tank','artillery'].forEach(k=>btn(defs[k].name+' '+costText(defs[k].cost),function(){train(b,k)},!canPay(defs[k].cost)||countPop('p')+3>myCap()))}
+btn('修復建築 50木',function(){if(pay({wood:50})){b.hp=Math.min(b.max,b.hp+180);log('建築已修復')}updateUI()},resources.wood<50||b.hp>=b.max);
+}
+if(!ui.actions.children.length){btn('選取平民以建造',function(){},true);btn('選取兵營／工廠以生產',function(){},true)}
+}
+function renderSelection(){
+if(!selected.length){ui.selection.innerHTML='尚未選取單位。<div class="muted">選取平民後可建造設施；選取軍隊後可下達攻擊命令。</div>';return}
+if(selected.length>1){ui.selection.innerHTML='已選取 '+selected.length+' 個單位<div class="muted">右鍵移動或攻擊。選取平民可下達採集命令。</div>';return}
+var o=selected[0],hp=Math.max(0,Math.ceil(o.hp))+'/'+o.max;
+ui.selection.innerHTML='<b>'+(o.kind==='unit'?defs[o.type].name:buildingDefs[o.type].name)+'</b><div class="muted">耐久 '+hp+(o.kind==='building'&&o.queue.length?'　生產中 '+o.queue.length:'')+'</div>';
+}
+function train(b,type){var d=defs[type];if(!pay(d.cost)||countPop('p')+d.pop>myCap()){log('資源或人口不足');updateUI();return}b.queue.push({type:type,remain:d.time});log(b.type==='factory'?'戰車生產排程':'部隊生產排程：'+d.name);updateUI()}
+function dist(a,b){return Math.hypot(a.x-b.x,a.y-b.y)}
+function nearestNode(u,type){var best=null,bd=1e9;nodes.forEach(n=>{if(n.type===type&&n.amount>0){var d=dist(u,n);if(d<bd){best=n;bd=d}}});return best}
+function nearestEnemy(u,range){var best=null,bd=range||1e9;units.concat(buildings).forEach(o=>{if(o.team!==u.team&&o.hp>0){var d=dist(u,o);if(d<bd){bd=d;best=o}}});return best}
+function rightClick(x,y){
+if(placing){var d=buildingDefs[placing];if(!pay(d.cost)){log('資源不足');return}if(buildings.some(b=>Math.abs(b.x-x)<(buildingDefs[b.type].w+d.w)/2+8&&Math.abs(b.y-y)<(buildingDefs[b.type].h+d.h)/2+8)){resources.wood+=d.cost.wood||0;resources.ore+=d.cost.ore||0;log('位置被其他建築占用');return}if(x<50||x>W-50||y<50||y>H-50){log('不能在地圖邊界建造');return}makeBuilding('p',placing,x,y);log('完成建造：'+d.name);placing=null;updateUI();return}
+if(!selected.length)return;
+var target=units.concat(buildings).find(o=>o.team==='e'&&Math.hypot(o.x-x,o.y-y)<Math.max(22,o.kind==='building'?40:20));
+selected.forEach(u=>{if(u.kind!=='unit'||u.team!=='p')return;if(target){u.order={type:'attack',target:target.id};u.target=target.id}else if(u.type==='worker'){var n=nodes.find(n=>dist(n,{x:x,y:y})<35&&n.amount>0);if(n)u.order={type:'gather',node:n};else u.order={type:'move',x:x,y:y}}else u.order={type:'move',x:x,y:y}});
+}
+function screenToWorld(cx,cy){var r=canvas.getBoundingClientRect();return{x:(cx-r.left-ox)/scale,y:(cy-r.top-oy)/scale}}
+function resize(){var r=stage.getBoundingClientRect(),dpr=Math.min(2,window.devicePixelRatio||1);canvas.width=Math.floor(r.width*dpr);canvas.height=Math.floor(r.height*dpr);ctx.setTransform(dpr,0,0,dpr,0,0);scale=Math.min(r.width/W,r.height/H);ox=(r.width-W*scale)/2;oy=(r.height-H*scale)/2}
+window.addEventListener('resize',resize);resize();
+canvas.addEventListener('contextmenu',e=>e.preventDefault());
+canvas.addEventListener('mousedown',e=>{var p=screenToWorld(e.clientX,e.clientY);if(e.button===2){rightClick(p.x,p.y);return}drag={x:p.x,y:p.y,cx:e.clientX,cy:e.clientY}});
+canvas.addEventListener('mouseup',e=>{if(!drag)return;var p=screenToWorld(e.clientX,e.clientY);if(Math.hypot(e.clientX-drag.cx,e.clientY-drag.cy)>8){var x1=Math.min(drag.x,p.x),x2=Math.max(drag.x,p.x),y1=Math.min(drag.y,p.y),y2=Math.max(drag.y,p.y);selected=units.filter(u=>u.team==='p'&&u.x>=x1&&u.x<=x2&&u.y>=y1&&u.y<=y2)}else{var hit=units.concat(buildings).filter(o=>o.team==='p'&&Math.hypot(o.x-p.x,o.y-p.y)<(o.kind==='building'?48:18)).sort((a,b)=>dist(a,p)-dist(b,p))[0];selected=hit?[hit]:[]}drag=null;updateUI()});
+function moveTo(o,x,y,dt){var dx=x-o.x,dy=y-o.y,d=Math.hypot(dx,dy);if(d>5){var step=Math.min(d,defs[o.type].speed*dt);o.x+=dx/d*step;o.y+=dy/d*step}}
+function findById(id){return units.concat(buildings).find(o=>o.id===id)}
+function shoot(a,t,d,dt){if(!t||t.hp<=0)return;var dd=dist(a,t);if(dd>d.range){moveTo(a,t.x,t.y,dt);return}a.cool-=dt;if(a.cool<=0){a.cool=d.rate;bullets.push({x:a.x,y:a.y,tx:t.x,ty:t.y,team:a.team,damage:d.damage,speed:340,type:a.type})}}
+function updateUnit(u,dt){
+var d=defs[u.type];if(u.order&&u.order.type==='move'){moveTo(u,u.order.x,u.order.y,dt);if(Math.hypot(u.x-u.order.x,u.y-u.order.y)<7)u.order=null;return}
+if(u.type==='worker'){
+if(u.order&&u.order.type==='gather'){var n=u.order.node;if(!n||n.amount<=0){n=nearestNode(u,'wood');u.order.node=n;if(!n)return}if(dist(u,n)>22){moveTo(u,n.x,n.y,dt)}else{u.gatherTime=(u.gatherTime||0)+dt;if(u.gatherTime>=1){u.gatherTime=0;var amount=Math.min(8,n.amount);n.amount-=amount;u.carry+=amount;u.resource=n.type;if(u.carry>=40||n.amount<=0){var h=buildings.find(b=>b.team===u.team&&b.type==='hq');if(h){u.order={type:'return',home:h.id};}}}}}
+else if(u.order&&u.order.type==='return'){var h=findById(u.order.home);if(h&&dist(u,h)>28)moveTo(u,h.x,h.y,dt);else if(h){resources[u.resource]=(resources[u.resource]||0)+u.carry;u.carry=0;u.order={type:'gather',node:nearestNode(u,u.resource)||nearestNode(u,'wood')};}}
+else{var threat=nearestEnemy(u,110);if(threat&&threat.kind==='unit'&&threat.type!=='worker')shoot(u,threat,d,dt)}
+return}
+var t=u.order&&u.order.type==='attack'?findById(u.order.target):nearestEnemy(u,d.range+80);
+if(t&&t.hp>0)shoot(u,t,d,dt);else if(u.order&&u.order.type==='attack')u.order=null;
+}
+function updateBuilding(b,dt){
+if(b.queue&&b.queue.length){var q=b.queue[0];q.remain-=dt;if(q.remain<=0){var d=buildingDefs[b.type];makeUnit(b.team,q.type,b.x+(Math.random()-.5)*45,b.y+d.h/2+24);b.queue.shift();if(b.team==='p')log('部隊完成：'+defs[q.type].name)}}
+if(b.type==='turret'){var target=nearestEnemy(b,210);if(target){b.cool=(b.cool||0)-dt;if(b.cool<=0){b.cool=1.0;bullets.push({x:b.x,y:b.y,tx:target.x,ty:target.y,team:b.team,damage:18,speed:400,type:'turret'})}}}
+}
+function enemyAI(dt){
+aiTimer+=dt;if(aiTimer>12){aiTimer=0;var ehq=buildings.find(b=>b.team==='e'&&b.type==='hq');if(!ehq)return;
+var workers=units.filter(u=>u.team==='e'&&u.type==='worker');
+if(workers.length<5&&countPop('e')<28)makeUnit('e','worker',ehq.x-75,ehq.y+75);
+var eb=buildings.filter(b=>b.team==='e');
+if(!eb.some(b=>b.type==='turret'))makeBuilding('e','turret',ehq.x-140,ehq.y+110);
+var barr=eb.find(b=>b.type==='barracks');if(barr&&countPop('e')<28){var type=Math.random()<.68?'rifle':'rocket';barr.queue.push({type:type,remain:defs[type].time});}
+var fac=eb.find(b=>b.type==='factory');if(fac&&Math.random()<.8&&countPop('e')<28)fac.queue.push({type:'tank',remain:defs.tank.time});
+if(elapsed>90&&!eb.some(b=>b.type==='fort'))makeBuilding('e','fort',ehq.x-210,ehq.y-120);
+}
+units.filter(u=>u.team==='e'&&u.type==='worker'&&(!u.order||u.order.type==='gather')).forEach(u=>{if(!u.order)u.order={type:'gather',node:nearestNode(u,'wood')||nearestNode(u,'ore')}});
+var enemyArmy=units.filter(u=>u.team==='e'&&u.type!=='worker'),myArmy=units.filter(u=>u.team==='p'&&u.type!=='worker');
+if(enemyArmy.length>6&&myArmy.length>0){enemyArmy.forEach(u=>{if(!u.order||u.order.type!=='attack'){var h=buildings.find(b=>b.team==='p'&&b.type==='hq');if(h)u.order={type:'attack',target:h.id}}})}
+}
+function tick(dt){
+elapsed+=dt;enemyAI(dt);
+units.slice().forEach(u=>{if(u.hp>0)updateUnit(u,dt)});
+buildings.slice().forEach(b=>{if(b.hp>0)updateBuilding(b,dt)});
+bullets.forEach(b=>{var dx=b.tx-b.x,dy=b.ty-b.y,d=Math.hypot(dx,dy),step=b.speed*dt;if(d<=step+5){var target=units.concat(buildings).filter(o=>o.team!==b.team&&o.hp>0).sort((a,c)=>Math.hypot(a.x-b.tx,a.y-b.ty)-Math.hypot(c.x-b.tx,c.y-b.ty))[0];if(target&&Math.hypot(target.x-b.tx,target.y-b.ty)<55){target.hp-=b.damage;effects.push({x:b.tx,y:b.ty,t:.2});}b.dead=true}else{b.x+=dx/d*step;b.y+=dy/d*step}});bullets=bullets.filter(b=>!b.dead);
+units=units.filter(u=>u.hp>0);buildings=buildings.filter(b=>b.hp>0);
+nodes.forEach(n=>{if(n.amount<=0)n.depleted=true});nodes=nodes.filter(n=>!n.depleted);
+effects.forEach(e=>e.t-=dt);effects=effects.filter(e=>e.t>0);
+var phq=buildings.some(b=>b.team==='p'&&b.type==='hq'),ehq=buildings.some(b=>b.team==='e'&&b.type==='hq'),forts=buildings.some(b=>b.team==='e'&&b.type==='fort');
+if(!phq||(!ehq&&!forts)){gameOver=true;paused=true;document.getElementById('overlay').style.display='flex';document.querySelector('.modal').innerHTML=phq?'<h1>戰役勝利！</h1><p>敵方主堡與所有前線堡壘均已摧毀。你成功掌握戰場。</p><button id="again" class="primary">重新開始</button>':'<h1>基地失守</h1><p>你的主堡已被摧毀。重新整頓經濟與防線，再次出擊吧。</p><button id="again" class="primary">重新開始</button>';document.getElementById('again').onclick=()=>{init();document.getElementById('overlay').style.display='none';paused=false};}
+if(Math.floor(elapsed)%2===0)updateUI();
+}
+function draw(){
+var r=stage.getBoundingClientRect();ctx.clearRect(0,0,r.width,r.height);ctx.save();ctx.translate(ox,oy);ctx.scale(scale,scale);
+ctx.fillStyle='#263c2e';ctx.fillRect(0,0,W,H);
+for(var x=0;x<W;x+=50)for(var y=0;y<H;y+=50){ctx.strokeStyle='rgba(180,210,160,.055)';ctx.strokeRect(x,y,50,50);if(((x/50+y/50)%7)===0){ctx.fillStyle='rgba(120,150,100,.08)';ctx.fillRect(x+8,y+9,3,3)}}
+ctx.fillStyle='#354638';ctx.fillRect(730,0,35,H);ctx.fillStyle='#526047';ctx.fillRect(738,0,5,H);
+nodes.forEach(n=>{ctx.save();ctx.translate(n.x,n.y);if(n.type==='wood'){ctx.fillStyle='#244e35';ctx.beginPath();ctx.arc(0,0,22,0,Math.PI*2);ctx.fill();ctx.fillStyle='#39734a';ctx.beginPath();ctx.arc(-7,-8,12,0,7);ctx.fill();ctx.fillStyle='#755a3d';ctx.fillRect(-3,4,6,17)}else if(n.type==='ore'){ctx.fillStyle='#73838b';ctx.beginPath();ctx.moveTo(-19,10);ctx.lineTo(-9,-16);ctx.lineTo(10,-20);ctx.lineTo(21,8);ctx.lineTo(3,18);ctx.closePath();ctx.fill();ctx.fillStyle='#b6c4c7';ctx.fillRect(-5,-9,8,4)}else{ctx.fillStyle='#171f28';ctx.beginPath();ctx.ellipse(0,0,24,14,0,0,7);ctx.fill();ctx.fillStyle='#9a7842';ctx.fillRect(-13,-2,26,4)}ctx.restore()});
+buildings.forEach(b=>{var d=buildingDefs[b.type],friendly=b.team==='p';ctx.save();ctx.translate(b.x,b.y);ctx.fillStyle=friendly?'#315c7a':'#783c39';ctx.strokeStyle=friendly?'#8cc7dc':'#e58b78';ctx.lineWidth=2;ctx.fillRect(-d.w/2,-d.h/2,d.w,d.h);ctx.strokeRect(-d.w/2,-d.h/2,d.w,d.h);ctx.fillStyle=friendly?'#79b8d0':'#d77866';if(b.type==='hq'){ctx.fillRect(-d.w*.25,-d.h*.28,d.w*.5,d.h*.56);ctx.fillStyle='#d8d6b1';ctx.fillRect(-8,-d.h/2-9,16,13)}else if(b.type==='turret'){ctx.beginPath();ctx.arc(0,0,15,0,7);ctx.fill();ctx.fillStyle='#1a252b';ctx.fillRect(-4,-25,8,27)}else{ctx.fillRect(-d.w*.25,-d.h*.25,d.w*.5,d.h*.5)}ctx.fillStyle='#111';ctx.fillRect(-d.w/2,-d.h/2-10,d.w,5);ctx.fillStyle=friendly?'#65d1f0':'#ee796b';ctx.fillRect(-d.w/2,-d.h/2-10,d.w*Math.max(0,b.hp/b.max),5);ctx.restore()});
+units.forEach(u=>{var friendly=u.team==='p';ctx.save();ctx.translate(u.x,u.y);ctx.fillStyle=friendly?'#68c5e4':'#ec7568';ctx.strokeStyle='#111';ctx.lineWidth=2;if(u.type==='tank'||u.type==='artillery'){ctx.fillRect(-13,-9,26,18);ctx.fillStyle=friendly?'#b3d8d9':'#d7aaa0';ctx.fillRect(-5,-4,19,8);ctx.fillStyle='#222';ctx.fillRect(-15,-11,30,4);ctx.fillRect(-15,7,30,4)}else{ctx.beginPath();ctx.arc(0,0,u.type==='worker'?7:8,0,7);ctx.fill();ctx.stroke();ctx.fillStyle='#e3d6b5';ctx.fillRect(-3,-3,6,6)}if(selected.includes(u)){ctx.strokeStyle='#ffe38c';ctx.lineWidth=2;ctx.beginPath();ctx.ellipse(0,0,15,11,0,0,7);ctx.stroke()}ctx.fillStyle='#111';ctx.fillRect(-11,-17,22,3);ctx.fillStyle=friendly?'#74e0a0':'#fa8175';ctx.fillRect(-11,-17,22*Math.max(0,u.hp/u.max),3);ctx.restore()});
+bullets.forEach(b=>{ctx.strokeStyle=b.team==='p'?'#a9edff':'#ff9c80';ctx.lineWidth=3;ctx.beginPath();ctx.moveTo(b.x,b.y);ctx.lineTo(b.x-(b.tx-b.x)*.06,b.y-(b.ty-b.y)*.06);ctx.stroke()});
+effects.forEach(e=>{ctx.strokeStyle='#ffe39b';ctx.beginPath();ctx.arc(e.x,e.y,12*(1-e.t/.2),0,7);ctx.stroke()});
+if(drag){ctx.strokeStyle='#ffe38c';ctx.setLineDash([6,4]);ctx.strokeRect(drag.x,drag.y,0,0);ctx.setLineDash([])}
+if(placing){var d=buildingDefs[placing];ctx.strokeStyle='#f1d27d';ctx.setLineDash([6,4]);ctx.strokeRect(mouse.x-d.w/2,mouse.y-d.h/2,d.w,d.h);ctx.setLineDash([])}
+ctx.restore();
+}
+var mouse={x:700,y:500};canvas.addEventListener('mousemove',e=>{var p=screenToWorld(e.clientX,e.clientY);mouse=p});
+function frame(t){var dt=Math.min(.05,(t-last)/1000||0);last=t;if(!paused&&!gameOver){acc+=dt*speed;while(acc>=.05){tick(.05);acc-=.05}}draw();requestAnimationFrame(frame)}
+document.getElementById('start').onclick=()=>{init();started=true;paused=false;document.getElementById('overlay').style.display='none'};
+document.getElementById('pause').onclick=()=>{if(!started||gameOver)return;paused=!paused;document.getElementById('pause').textContent=paused?'▶ 繼續':'Ⅱ 暫停';document.getElementById('pauseTag').style.display=paused?'block':'none'};
+document.getElementById('speed').onclick=()=>{speed=speed===1?2:speed===2?3:1;document.getElementById('speed').textContent='速度 ×'+speed};
+document.getElementById('reset').onclick=()=>{if(confirm('確定要重新開始這場戰役？')){init();started=true;paused=false;document.getElementById('overlay').style.display='none';document.getElementById('pause').textContent='Ⅱ 暫停';document.getElementById('pauseTag').style.display='none'}};
+document.getElementById('save').onclick=()=>{try{localStorage.setItem('frontier_save',JSON.stringify({resources:resources,units:units,buildings:buildings,nodes:nodes,elapsed:elapsed,nextId:nextId}));log('遊戲進度已儲存於此瀏覽器')}catch(e){log('儲存失敗')}};
+function load(){try{var s=JSON.parse(localStorage.getItem('frontier_save'));if(!s)return false;resources=s.resources;units=s.units;buildings=s.buildings;nodes=s.nodes;elapsed=s.elapsed;nextId=s.nextId;return true}catch(e){return false}}
+requestAnimationFrame(frame);
+})();
+</script>
+</body></html>
