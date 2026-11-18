@@ -59,8 +59,8 @@ function fmt(t){return Math.floor(t/60)+':'+('0'+Math.floor(t%60)).slice(-2)}
 function costText(c){return Object.keys(c).map(k=>({wood:'木',ore:'礦',oil:'油'}[k])+c[k]).join(' ')}
 function canPay(c){return Object.keys(c).every(k=>resources[k]>=c[k])}
 function pay(c){if(!canPay(c))return false;Object.keys(c).forEach(k=>resources[k]-=c[k]);return true}
-function makeUnit(team,type,x,y){var d=defs[type],u={id:nextId++,team:team,type:type,x:x,y:y,hp:d.hp,max:d.hp,order:null,target:null,carry:0,resource:null,cool:Math.random(),buildQueue:[],moving:false};units.push(u);return u}
-function makeBuilding(team,type,x,y){var d=buildingDefs[type],b={id:nextId++,team:team,type:type,x:x,y:y,hp:d.hp,max:d.hp,queue:[],progress:0,active:true};buildings.push(b);return b}
+function makeUnit(team,type,x,y){var d=defs[type],u={id:nextId++,team:team,kind:'unit',type:type,x:x,y:y,hp:d.hp,max:d.hp,order:null,target:null,carry:0,resource:null,cool:Math.random(),buildQueue:[],moving:false};units.push(u);return u}
+function makeBuilding(team,type,x,y){var d=buildingDefs[type],b={id:nextId++,team:team,kind:'building',type:type,x:x,y:y,hp:d.hp,max:d.hp,queue:[],progress:0,active:true};buildings.push(b);return b}
 function node(type,x,y,amount){nodes.push({type:type,x:x,y:y,amount:amount,max:amount})}
 function init(){
 resources={wood:300,ore:220,oil:100};units=[];buildings=[];nodes=[];bullets=[];effects=[];nextId=1;elapsed=0;aiTimer=0;spawnTimer=0;gameOver=false;selected=[];placing=null;popCap=30;
@@ -78,7 +78,7 @@ updateUI();log('戰役開始。敵軍基地位於東側，準備擴張。');
 function countPop(team){return units.filter(u=>u.team===team).reduce((a,u)=>a+defs[u.type].pop,0)}
 function myCap(){return 30+buildings.filter(b=>b.team==='p'&&b.type==='hq').length*10+buildings.filter(b=>b.team==='p'&&b.type==='fort').length*5}
 function updateUI(){
-ui.wood.textContent=Math.floor(resources.wood);ui.ore.textContent=Math.floor(resources.ore);ui.oil.textContent=Math.floor(resources.oil);ui.pop.textContent=countPop('p')+'/'+myCap();
+selected=selected.filter(o=>o&&o.hp>0);ui.wood.textContent=Math.floor(resources.wood);ui.ore.textContent=Math.floor(resources.ore);ui.oil.textContent=Math.floor(resources.oil);ui.pop.textContent=countPop('p')+'/'+myCap();
 renderActions();renderSelection();
 }
 function renderActions(){
@@ -99,7 +99,7 @@ if(!ui.actions.children.length){btn('選取平民以建造',function(){},true);b
 function renderSelection(){
 if(!selected.length){ui.selection.innerHTML='尚未選取單位。<div class="muted">選取平民後可建造設施；選取軍隊後可下達攻擊命令。</div>';return}
 if(selected.length>1){ui.selection.innerHTML='已選取 '+selected.length+' 個單位<div class="muted">右鍵移動或攻擊。選取平民可下達採集命令。</div>';return}
-var o=selected[0],hp=Math.max(0,Math.ceil(o.hp))+'/'+o.max;
+var o=selected[0],hp=Math.max(0,Math.ceil(o.hp))+'/'+o.max;if(!o.kind)o.kind=defs[o.type]?'unit':'building';
 ui.selection.innerHTML='<b>'+(o.kind==='unit'?defs[o.type].name:buildingDefs[o.type].name)+'</b><div class="muted">耐久 '+hp+(o.kind==='building'&&o.queue.length?'　生產中 '+o.queue.length:'')+'</div>';
 }
 function train(b,type){var d=defs[type];if(!pay(d.cost)||countPop('p')+d.pop>myCap()){log('資源或人口不足');updateUI();return}b.queue.push({type:type,remain:d.time});log(b.type==='factory'?'戰車生產排程':'部隊生產排程：'+d.name);updateUI()}
@@ -159,7 +159,7 @@ nodes.forEach(n=>{if(n.amount<=0)n.depleted=true});nodes=nodes.filter(n=>!n.depl
 effects.forEach(e=>e.t-=dt);effects=effects.filter(e=>e.t>0);
 var phq=buildings.some(b=>b.team==='p'&&b.type==='hq'),ehq=buildings.some(b=>b.team==='e'&&b.type==='hq'),forts=buildings.some(b=>b.team==='e'&&b.type==='fort');
 if(!phq||(!ehq&&!forts)){gameOver=true;paused=true;document.getElementById('overlay').style.display='flex';document.querySelector('.modal').innerHTML=phq?'<h1>戰役勝利！</h1><p>敵方主堡與所有前線堡壘均已摧毀。你成功掌握戰場。</p><button id="again" class="primary">重新開始</button>':'<h1>基地失守</h1><p>你的主堡已被摧毀。重新整頓經濟與防線，再次出擊吧。</p><button id="again" class="primary">重新開始</button>';document.getElementById('again').onclick=()=>{init();document.getElementById('overlay').style.display='none';paused=false};}
-if(Math.floor(elapsed)%2===0)updateUI();
+if(!tick.uiTimer)tick.uiTimer=0;tick.uiTimer+=dt;if(tick.uiTimer>=0.5){tick.uiTimer=0;updateUI();}
 }
 function draw(){
 var r=stage.getBoundingClientRect();ctx.clearRect(0,0,r.width,r.height);ctx.save();ctx.translate(ox,oy);ctx.scale(scale,scale);
