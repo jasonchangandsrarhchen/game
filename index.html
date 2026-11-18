@@ -128,7 +128,7 @@ window.addEventListener('resize',resize);resize();
 canvas.addEventListener('contextmenu',e=>e.preventDefault());
 canvas.addEventListener('mousedown',e=>{var p=screenToWorld(e.clientX,e.clientY);if(e.button===2){rightClick(p.x,p.y);return}drag={x:p.x,y:p.y,cx:e.clientX,cy:e.clientY}});
 canvas.addEventListener('mouseup',e=>{if(!drag)return;var p=screenToWorld(e.clientX,e.clientY);if(Math.hypot(e.clientX-drag.cx,e.clientY-drag.cy)>8){var x1=Math.min(drag.x,p.x),x2=Math.max(drag.x,p.x),y1=Math.min(drag.y,p.y),y2=Math.max(drag.y,p.y);selected=units.filter(u=>u.team==='p'&&u.x>=x1&&u.x<=x2&&u.y>=y1&&u.y<=y2)}else{var hit=units.concat(buildings).filter(o=>o.team==='p'&&Math.hypot(o.x-p.x,o.y-p.y)<(o.kind==='building'?48:18)).sort((a,b)=>dist(a,p)-dist(b,p))[0];selected=hit?[hit]:[]}drag=null;updateUI()});
-function moveTo(o,x,y,dt){var dx=x-o.x,dy=y-o.y,d=Math.hypot(dx,dy);if(d>5){var step=Math.min(d,defs[o.type].speed*dt);o.x+=dx/d*step;o.y+=dy/d*step}}
+function moveTo(o,x,y,dt){var dx=x-o.x,dy=y-o.y,d=Math.hypot(dx,dy);if(d>5){var sp=defs[o.type].speed;if(o.team==='p'&&techs.engines)sp*=1.25;var step=Math.min(d,sp*dt);o.x+=dx/d*step;o.y+=dy/d*step}}
 function findById(id){return units.concat(buildings).find(o=>o.id===id)}
 function shoot(a,t,d,dt){if(!t||t.hp<=0)return;var dd=dist(a,t);if(dd>d.range){moveTo(a,t.x,t.y,dt);return}a.cool-=dt;if(a.cool<=0){a.cool=d.rate;bullets.push({x:a.x,y:a.y,tx:t.x,ty:t.y,team:a.team,damage:d.damage,speed:340,type:a.type})}}
 function updateUnit(u,dt){
@@ -156,6 +156,7 @@ var ecoTypes=[['lumber','wood'],['mine','ore'],['power','oil']];ecoTypes.forEach
 if(!eb.some(b=>b.type==='turret'))makeBuilding('e','turret',ehq.x-140,ehq.y+110);
 var barr=eb.find(b=>b.type==='barracks');if(barr&&countPop('e')<28){var type=Math.random()<.68?'rifle':'rocket';if(Object.keys(defs[type].cost).every(k=>(enemyResources[k]||0)>=defs[type].cost[k])){Object.keys(defs[type].cost).forEach(k=>enemyResources[k]-=defs[type].cost[k]);barr.queue.push({type:type,remain:defs[type].time});}}
 var fac=eb.find(b=>b.type==='factory');if(fac&&Math.random()<.8&&countPop('e')<28&&Object.keys(defs.tank.cost).every(k=>(enemyResources[k]||0)>=defs.tank.cost[k])){Object.keys(defs.tank.cost).forEach(k=>enemyResources[k]-=defs.tank.cost[k]);fac.queue.push({type:'tank',remain:defs.tank.time});}
+[['lab', 'wood',180,'ore',140],['bunker','wood',120,'ore',140],['depot','wood',150,'ore',90]].forEach(v=>{if(!eb.some(b=>b.type===v[0])&&enemyResources[v[1]]>=v[2]&&enemyResources[v[3]]>=v[4]){enemyResources[v[1]]-=v[2];enemyResources[v[3]]-=v[4];makeBuilding('e',v[0],ehq.x-170+(Math.random()-.5)*100,ehq.y+(Math.random()-.5)*240);eb.push(buildings[buildings.length-1]);}});
 if(elapsed>90&&!eb.some(b=>b.type==='fort'))makeBuilding('e','fort',ehq.x-210,ehq.y-120);
 }
 units.filter(u=>u.team==='e'&&u.type==='worker'&&(!u.order||u.order.type==='gather')).forEach(u=>{if(!u.order){var choices=['wood','ore','oil'].map(t=>nearestNode(u,t)).filter(Boolean).sort((a,b)=>a.amount-b.amount);var n=choices[0]||nearestNode(u,'wood');if(n){u.resource=n.type;u.order={type:'gather',node:n};}}});
