@@ -103,7 +103,7 @@ var o=selected[0];if(!o||typeof o!=='object'){selected=[];ui.selection.textConte
 var isUnit=o.kind==='unit'||!!defs[o.type],def=isUnit?defs[o.type]:buildingDefs[o.type];
 if(!def){ui.selection.textContent='選取目標資料異常，請重新選取。';return}
 var hp=Math.max(0,Math.ceil(Number(o.hp)||0))+'/'+(Number(o.max)||def.hp);
-var title=document.createElement('b');title.textContent=def.name;var detail=document.createElement('div');detail.className='muted';detail.textContent='耐久 '+hp+(!isUnit&&Array.isArray(o.queue)&&o.queue.length?'　生產中 '+o.queue.length:'');ui.selection.replaceChildren(title,detail);
+var title=document.createElement('b');title.textContent=def.name;var detail=document.createElement('div');detail.className='muted';var info='耐久 '+hp;if(!isUnit){var notes={lumber:'附近木材採集效率 +50%，可交付木材',mine:'附近礦石採集效率 +50%，可交付礦石',power:'附近油田採集效率 +50%，可交付石油',fort:'周圍友軍每秒恢復 7 HP；可設為部隊集結點',turret:'自動攻擊 210 範圍內的敵軍'};info+='　'+(notes[o.type]||'基地設施');if(Array.isArray(o.queue)&&o.queue.length)info+='　生產中 '+o.queue.length;}detail.textContent=info;ui.selection.replaceChildren(title,detail);
 }
 function train(b,type){var d=defs[type];if(!pay(d.cost)||countPop('p')+d.pop>myCap()){log('資源或人口不足');updateUI();return}b.queue.push({type:type,remain:d.time});log(b.type==='factory'?'戰車生產排程':'部隊生產排程：'+d.name);updateUI()}
 function dist(a,b){return Math.hypot(a.x-b.x,a.y-b.y)}
