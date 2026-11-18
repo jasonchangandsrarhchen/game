@@ -78,8 +78,8 @@ updateUI();log('戰役開始。敵軍基地位於東側，準備擴張。');
 function countPop(team){return units.filter(u=>u.team===team).reduce((a,u)=>a+defs[u.type].pop,0)}
 function myCap(){return 30+buildings.filter(b=>b.team==='p'&&b.type==='hq').length*10+buildings.filter(b=>b.team==='p'&&b.type==='fort').length*5}
 function updateUI(){
-selected=selected.filter(o=>o&&o.hp>0);ui.wood.textContent=Math.floor(resources.wood);ui.ore.textContent=Math.floor(resources.ore);ui.oil.textContent=Math.floor(resources.oil);ui.pop.textContent=countPop('p')+'/'+myCap();
-renderActions();renderSelection();
+selected=selected.filter(o=>o&&Number(o.hp)>0);ui.wood.textContent=Math.floor(resources.wood);ui.ore.textContent=Math.floor(resources.ore);ui.oil.textContent=Math.floor(resources.oil);ui.pop.textContent=countPop('p')+'/'+myCap();
+try{renderActions();renderSelection()}catch(err){console.error('UI render error',err);ui.selection.textContent='介面更新錯誤：'+(err&&err.message?err.message:'未知錯誤');ui.actions.replaceChildren()}
 }
 function renderActions(){
 var b=selected.length===1?selected[0]:null,html='';
@@ -97,10 +97,13 @@ btn('修復建築 50木',function(){if(pay({wood:50})){b.hp=Math.min(b.max,b.hp+
 if(!ui.actions.children.length){btn('選取平民以建造',function(){},true);btn('選取兵營／工廠以生產',function(){},true)}
 }
 function renderSelection(){
-if(!selected.length){ui.selection.innerHTML='尚未選取單位。<div class="muted">選取平民後可建造設施；選取軍隊後可下達攻擊命令。</div>';return}
-if(selected.length>1){ui.selection.innerHTML='已選取 '+selected.length+' 個單位<div class="muted">右鍵移動或攻擊。選取平民可下達採集命令。</div>';return}
-var o=selected[0],hp=Math.max(0,Math.ceil(o.hp))+'/'+o.max;if(!o.kind)o.kind=defs[o.type]?'unit':'building';
-ui.selection.innerHTML='<b>'+(o.kind==='unit'?defs[o.type].name:buildingDefs[o.type].name)+'</b><div class="muted">耐久 '+hp+(o.kind==='building'&&o.queue.length?'　生產中 '+o.queue.length:'')+'</div>';
+if(!selected.length){ui.selection.textContent='尚未選取單位。';var tip=document.createElement('div');tip.className='muted';tip.textContent='選取平民後可建造設施；選取軍隊後可下達攻擊命令。';ui.selection.appendChild(tip);return}
+if(selected.length>1){ui.selection.textContent='已選取 '+selected.length+' 個單位';var tip=document.createElement('div');tip.className='muted';tip.textContent='右鍵移動或攻擊。選取平民可下達採集命令。';ui.selection.appendChild(tip);return}
+var o=selected[0];if(!o||typeof o!=='object'){selected=[];ui.selection.textContent='尚未選取單位。';return}
+var isUnit=o.kind==='unit'||!!defs[o.type],def=isUnit?defs[o.type]:buildingDefs[o.type];
+if(!def){ui.selection.textContent='選取目標資料異常，請重新選取。';return}
+var hp=Math.max(0,Math.ceil(Number(o.hp)||0))+'/'+(Number(o.max)||def.hp);
+var title=document.createElement('b');title.textContent=def.name;var detail=document.createElement('div');detail.className='muted';detail.textContent='耐久 '+hp+(!isUnit&&Array.isArray(o.queue)&&o.queue.length?'　生產中 '+o.queue.length:'');ui.selection.replaceChildren(title,detail);
 }
 function train(b,type){var d=defs[type];if(!pay(d.cost)||countPop('p')+d.pop>myCap()){log('資源或人口不足');updateUI();return}b.queue.push({type:type,remain:d.time});log(b.type==='factory'?'戰車生產排程':'部隊生產排程：'+d.name);updateUI()}
 function dist(a,b){return Math.hypot(a.x-b.x,a.y-b.y)}
