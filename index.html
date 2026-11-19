@@ -58,6 +58,8 @@ turret:{name:'機槍塔',cost:{wood:80,ore:100},hp:430,w:48,h:48,kind:'turret'},
 fort:{name:'前線堡壘',cost:{wood:160,ore:180},hp:850,w:76,h:68,kind:'fort'},
 lab:{name:'科技研究所',cost:{wood:180,ore:140},hp:520,w:70,h:60,kind:'lab'},
 bunker:{name:'重型碉堡',cost:{wood:120,ore:140},hp:680,w:60,h:56,kind:'bunker'},
+cannon:{name:'重砲塔',cost:{wood:180,ore:220,oil:80},hp:920,w:76,h:72,kind:'cannon'},
+missile:{name:'飛彈發射井',cost:{wood:120,ore:160,oil:120},hp:780,w:68,h:64,kind:'missile'},
 depot:{name:'補給中心',cost:{wood:150,ore:90},hp:480,w:64,h:56,kind:'depot'},
 wonder:{name:'世界奇觀',cost:{wood:900,ore:700,oil:350},hp:2400,w:112,h:104,kind:'wonder'}
 };
@@ -67,7 +69,7 @@ function costText(c){return Object.keys(c).map(k=>({wood:'木',ore:'礦',oil:'�
 function eraName(team){return eraNames[eras[team]||0]}
 function unitName(type,team){var names={worker:['石器採集者','封建工匠','帝國工程師','科技工程師'],rifle:['石矛戰士','長弓兵','火槍兵','電磁步兵'],rocket:['投石兵','弩砲手','火箭兵','等離子反裝甲兵'],scout:['馴狼斥候','輕騎斥候','裝甲偵察車','無人偵察機'],medic:['草藥療癒師','戰地醫護兵','野戰醫療官','醫療機器人'],tank:['攻城車','重型攻城車','主力戰車','懸浮重戰車'],artillery:['投石器','重型弩砲','自走火砲','軌道火砲'],heavy:['巨型攻城機','重裝戰車','超重型戰車','泰坦機甲']};return (names[type]||[])[eras[team]||0]||defs[type].name}
 function canBuildAt(type,x,y){var d=buildingDefs[type];if(x-d.w/2<0||x+d.w/2>W||y-d.h/2<0||y+d.h/2>H)return false;return !buildings.some(b=>{var q=buildingDefs[b.type];return Math.abs(b.x-x)<(q.w+d.w)/2+8&&Math.abs(b.y-y)<(q.h+d.h)/2+8})}
-function minEraForBuilding(type){return ({factory:1,lab:1,bunker:2,depot:2,fort:1,turret:1,wonder:0})[type]||0}
+function minEraForBuilding(type){return ({factory:1,lab:1,bunker:2,depot:2,cannon:2,missile:2,fort:1,turret:1,wonder:0})[type]||0}
 function minEraForUnit(type){return ({rocket:1,scout:1,medic:1,tank:2,artillery:2,heavy:3})[type]||0}
 function eraCost(next){return [{wood:150,ore:100},{wood:300,ore:250,oil:100},{wood:450,ore:400,oil:250}][next-1]}
 function wonderUpgradeCost(level){return [null,{wood:900,ore:700,oil:350},{wood:1500,ore:1200,oil:700},{wood:2500,ore:2000,oil:1400}][level]}
@@ -95,13 +97,16 @@ function updateUI(){
 selected=selected.filter(o=>o&&Number(o.hp)>0);ui.wood.textContent=Math.floor(resources.wood);ui.ore.textContent=Math.floor(resources.ore);ui.oil.textContent=Math.floor(resources.oil);ui.pop.textContent=countPop('p')+'/'+myCap();ui.era.textContent=eraName('p');
 try{renderActions();renderSelection()}catch(err){console.error('UI render error',err);ui.selection.textContent='介面更新錯誤：'+(err&&err.message?err.message:'未知錯誤');ui.actions.replaceChildren()}
 }
+var buildHotkeys={barracks:'1',factory:'2',lumber:'3',mine:'4',power:'5',turret:'6',fort:'7',lab:'8',bunker:'9',depot:'0',cannon:'Q',missile:'W',wonder:'E'};
+function startBuild(k){var d=buildingDefs[k];if(!d||!selected.some(o=>o.team==='p'&&o.kind==='unit'&&o.type==='worker'))return;if(eras.p<minEraForBuilding(k)||!canPay(d.cost)){log('無法建造：時代或資源不足。');return}placing=k;log('選擇建造'+d.name+'：按右鍵放置，Esc 取消。');renderActions()}
 function renderActions(){
 var b=selected.length===1?selected[0]:null,html='';
 function btn(label,fn,disabled){var el=document.createElement('button');el.textContent=label;el.disabled=!!disabled;el.onclick=fn;ui.actions.appendChild(el)}
 ui.actions.innerHTML='';
-if(placing){btn('取消建造',function(){placing=null;renderActions()});return}
+if(placing){btn('取消建造 [Esc]',function(){placing=null;renderActions()});return}
 if(b&&b.team==='p'&&b.kind==='unit'&&b.type==='worker'){
-Object.keys(buildingDefs).filter(k=>k!=='hq'&&eras.p>=minEraForBuilding(k)&&(k!=='wonder'||!buildings.some(v=>v.team==='p'&&v.type==='wonder'))).forEach(k=>{var d=buildingDefs[k];btn(d.name+'\n'+costText(d.cost),function(){placing=k;log('選擇建造'+d.name+'：只能放在沒有任何建築的空地。');renderActions()},!canPay(d.cost))});
+var keyHint=document.createElement('div');keyHint.className='hint';keyHint.textContent='建築快捷鍵：1–0、Q/W/E；Esc 取消建造';ui.actions.appendChild(keyHint);
+Object.keys(buildingDefs).filter(k=>k!=='hq'&&eras.p>=minEraForBuilding(k)&&(k!=='wonder'||!buildings.some(v=>v.team==='p'&&v.type==='wonder'))).forEach(k=>{var d=buildingDefs[k];btn(d.name+' ['+(buildHotkeys[k]||'')+']\n'+costText(d.cost),function(){startBuild(k)},!canPay(d.cost))});
 }else if(b&&b.team==='p'&&b.kind==='building'){
 if(['hq','barracks','factory'].includes(b.type)){
 var ro=b.rallyOrder;var rallyLabel=!ro?'未設定':ro.type==='attack'?'攻擊目標':ro.type==='gather'?'資源目標':'地面座標';
@@ -125,7 +130,7 @@ var o=selected[0];if(!o||typeof o!=='object'){selected=[];ui.selection.textConte
 var isUnit=o.kind==='unit'||!!defs[o.type],def=isUnit?defs[o.type]:buildingDefs[o.type];
 if(!def){ui.selection.textContent='選取目標資料異常，請重新選取。';return}
 var hp=Math.max(0,Math.ceil(Number(o.hp)||0))+'/'+(Number(o.max)||def.hp);
-var title=document.createElement('b');title.textContent=isUnit?unitName(o.type,o.team):def.name;var detail=document.createElement('div');detail.className='muted';var info='耐久 '+hp;if(!isUnit){var notes={wonder:'文明躍進核心：每階段選擇軍事或經濟永久加成；升級奇觀才能進入下一時代',lab:'可研究武器、裝甲與引擎科技',bunker:'自動攻擊 175 範圍內敵軍',depot:'附近友軍緩慢恢復生命',lumber:'附近木材採集效率 +50%，可交付木材',mine:'附近礦石採集效率 +50%，可交付礦石',power:'附近油田採集效率 +50%，可交付石油',fort:'周圍友軍每秒恢復 7 HP；可設為部隊集結點',turret:'自動攻擊 210 範圍內的敵軍'};info+='　'+(notes[o.type]||'基地設施');if(Array.isArray(o.queue)&&o.queue.length)info+='　生產中 '+o.queue.length;}detail.textContent=info;ui.selection.replaceChildren(title,detail);
+var title=document.createElement('b');title.textContent=isUnit?unitName(o.type,o.team):def.name;var detail=document.createElement('div');detail.className='muted';var info='耐久 '+hp;if(!isUnit){var notes={cannon:'重砲塔：330 射程，105 傷害，適合遠距離重創敵方戰車與建築',missile:'飛彈發射井：285 射程，52 傷害，快速攔截敵方部隊',wonder:'文明躍進核心：每階段選擇軍事或經濟永久加成；升級奇觀才能進入下一時代',lab:'可研究武器、裝甲與引擎科技',bunker:'自動攻擊 175 範圍內敵軍',depot:'附近友軍緩慢恢復生命',lumber:'附近木材採集效率 +50%，可交付木材',mine:'附近礦石採集效率 +50%，可交付礦石',power:'附近油田採集效率 +50%，可交付石油',fort:'周圍友軍每秒恢復 7 HP；可設為部隊集結點',turret:'自動攻擊 210 範圍內的敵軍'};info+='　'+(notes[o.type]||'基地設施');if(Array.isArray(o.queue)&&o.queue.length)info+='　生產中 '+o.queue.length;}detail.textContent=info;ui.selection.replaceChildren(title,detail);
 }
 function train(b,type){var d=defs[type];if(eras.p<minEraForUnit(type)){log('尚未進入可訓練此兵種的時代');return}if(!pay(d.cost)||countPop('p')+d.pop>myCap()){log('資源或人口不足');updateUI();return}b.queue.push({type:type,remain:d.time});log(b.type==='factory'?'戰車生產排程':'部隊生產排程：'+d.name);updateUI()}
 function dist(a,b){return Math.hypot(a.x-b.x,a.y-b.y)}
@@ -143,6 +148,7 @@ selected.forEach(u=>{if(u.kind!=='unit'||u.team!=='p')return;if(target){u.order=
 function screenToWorld(cx,cy){var r=canvas.getBoundingClientRect();return{x:(cx-r.left-ox)/scale,y:(cy-r.top-oy)/scale}}
 function resize(){var r=stage.getBoundingClientRect(),dpr=Math.min(2,window.devicePixelRatio||1);canvas.width=Math.floor(r.width*dpr);canvas.height=Math.floor(r.height*dpr);ctx.setTransform(dpr,0,0,dpr,0,0);scale=Math.min(r.width/W,r.height/H);ox=(r.width-W*scale)/2;oy=(r.height-H*scale)/2}
 window.addEventListener('resize',resize);resize();
+window.addEventListener('keydown',e=>{if(e.repeat||e.ctrlKey||e.altKey||e.metaKey)return;var tag=(document.activeElement&&document.activeElement.tagName||'').toLowerCase();if(tag==='input'||tag==='textarea'||tag==='select')return;if(e.key==='Escape'&&placing){placing=null;updateUI();return}var worker=selected.length===1&&selected[0].team==='p'&&selected[0].kind==='unit'&&selected[0].type==='worker';if(!worker||placing)return;var key=e.key.toUpperCase(),type=Object.keys(buildHotkeys).find(k=>buildHotkeys[k]===key);if(type){e.preventDefault();startBuild(type)}});
 canvas.addEventListener('contextmenu',e=>e.preventDefault());
 canvas.addEventListener('mousedown',e=>{var p=screenToWorld(e.clientX,e.clientY);if(e.button===2){rightClick(p.x,p.y);return}drag={x:p.x,y:p.y,cx:e.clientX,cy:e.clientY}});
 canvas.addEventListener('mouseup',e=>{if(!drag)return;var p=screenToWorld(e.clientX,e.clientY);if(Math.hypot(e.clientX-drag.cx,e.clientY-drag.cy)>8){var x1=Math.min(drag.x,p.x),x2=Math.max(drag.x,p.x),y1=Math.min(drag.y,p.y),y2=Math.max(drag.y,p.y);selected=units.filter(u=>u.team==='p'&&u.x>=x1&&u.x<=x2&&u.y>=y1&&u.y<=y2)}else{var hit=units.concat(buildings).filter(o=>o.team==='p'&&Math.hypot(o.x-p.x,o.y-p.y)<(o.kind==='building'?48:18)).sort((a,b)=>dist(a,p)-dist(b,p))[0];selected=hit?[hit]:[]}drag=null;updateUI()});
@@ -176,6 +182,8 @@ function updateBuilding(b,dt){
 if(b.queue&&b.queue.length){var q=b.queue[0];q.remain-=dt;if(q.remain<=0){var d=buildingDefs[b.type],rally=b.rallyOrder||rallyPoints[b.team]||{x:b.x,y:b.y};var born=makeUnit(b.team,q.type,rally.x+(Math.random()-.5)*35,rally.y+35+(Math.random()-.5)*25);if(b.rallyOrder){var ro=b.rallyOrder;if(ro.type==='attack'&&findById(ro.target))born.order={type:'attack',target:ro.target};else if(ro.type==='gather'&&ro.node&&ro.node.amount>0){born.order={type:'gather',node:ro.node};born.resource=ro.node.type}else if(ro.type==='move')born.order={type:'move',x:ro.x,y:ro.y};}b.queue.shift();if(b.team==='p')log('部隊完成：'+unitName(q.type,b.team))}}
 if(b.type==='turret'){var target=nearestEnemy(b,210);if(target){b.cool=(b.cool||0)-dt;if(b.cool<=0){b.cool=1.0;bullets.push({x:b.x,y:b.y,tx:target.x,ty:target.y,team:b.team,source:b.id,damage:18,speed:400,type:'turret'})}}}if(b.type==='fort'){units.forEach(u=>{if(u.team===b.team&&u.hp>0&&dist(u,b)<115)u.hp=Math.min(u.max,u.hp+7*dt)});}
 if(b.type==='bunker'){var bt=nearestEnemy(b,175);if(bt){b.cool=(b.cool||0)-dt;if(b.cool<=0){b.cool=1.25;bullets.push({x:b.x,y:b.y,tx:bt.x,ty:bt.y,team:b.team,source:b.id,damage:13,speed:380,type:'bunker'})}}}
+if(b.type==='cannon'){var ct=nearestEnemy(b,330);if(ct){b.cool=(b.cool||0)-dt;if(b.cool<=0){b.cool=3.1;bullets.push({x:b.x,y:b.y,tx:ct.x,ty:ct.y,team:b.team,source:b.id,damage:105,speed:560,type:'cannon'})}}}
+if(b.type==='missile'){var mt=nearestEnemy(b,285);if(mt){b.cool=(b.cool||0)-dt;if(b.cool<=0){b.cool=1.75;bullets.push({x:b.x,y:b.y,tx:mt.x,ty:mt.y,team:b.team,source:b.id,damage:52,speed:470,type:'missile'})}}}
 if(b.type==='depot'){units.forEach(u=>{if(u.team===b.team&&u.type!=='worker'&&dist(u,b)<100)u.hp=Math.min(u.max,u.hp+2*dt)});}
 }
 function findOpenBuildingSpot(type,x,y){for(var r=0;r<=260;r+=35){for(var a=0;a<8;a++){var ang=a*Math.PI/4,px=Math.max(45,Math.min(W-45,x+Math.cos(ang)*r)),py=Math.max(45,Math.min(H-45,y+Math.sin(ang)*r));if(canBuildAt(type,px,py))return{x:px,y:py}}}return null}
@@ -285,6 +293,8 @@ function enemyAIFor(team,dt){
  if(eras[team]>=1&&eb.filter(b=>b.type==='turret').length<2)buildE('turret',ehq.x-145,ehq.y+110+eb.filter(b=>b.type==='turret').length*85);
  if(eras[team]>=1&&elapsed>100&&!eb.some(b=>b.type==='fort'))buildE('fort',ehq.x-230,ehq.y-120);
  if(eras[team]>=2&&eb.filter(b=>b.type==='bunker').length<2)buildE('bunker',ehq.x-220,ehq.y+120+eb.filter(b=>b.type==='bunker').length*75);
+ if(eras[team]>=2&&eb.filter(b=>b.type==='cannon').length<2)buildE('cannon',ehq.x+175,ehq.y+145+eb.filter(b=>b.type==='cannon').length*90);
+ if(eras[team]>=2&&elapsed>220&&eb.filter(b=>b.type==='missile').length<2)buildE('missile',ehq.x+235,ehq.y-145+eb.filter(b=>b.type==='missile').length*85);
  rallyPoints[team]={x:ehq.x-115,y:ehq.y};
  units.filter(u=>u.team===team&&u.type!=='worker'&&u.type!=='medic'&&(!u.order||u.order.type==='move')).forEach(u=>{if(dist(u,rallyPoints[team])>95)u.order={type:'move',x:rallyPoints[team].x+(Math.random()-.5)*45,y:rallyPoints[team].y+(Math.random()-.5)*55};});
  aiWaveTimers[team]+=dt;
@@ -294,7 +304,7 @@ function enemyAIFor(team,dt){
  if(aiWaveTimers[team]>=interval&&army.length>=3){
    var rivals=['p','e','n','s'].filter(t=>t!==team);
    var strategic=buildings.filter(b=>rivals.includes(b.team)&&['barracks','factory','lab','lumber','mine','power'].includes(b.type));
-   var defenses=buildings.filter(b=>rivals.includes(b.team)&&['fort','turret','bunker'].includes(b.type));
+   var defenses=buildings.filter(b=>rivals.includes(b.team)&&['fort','turret','bunker','cannon','missile'].includes(b.type));
    var targetPool=strategic.length?strategic:(defenses.length?defenses:buildings.filter(b=>rivals.includes(b.team)&&b.type==='hq'));
    var target=targetPool.sort((a,b)=>dist(ehq,a)-dist(ehq,b))[0];
    if(target){
