@@ -35,7 +35,7 @@ button.primary{background:#785a27;border-color:#c99b45;color:#fff}button.danger{
 "use strict";
 var canvas=document.getElementById('game'),ctx=canvas.getContext('2d'),stage=document.getElementById('stage');
 var W=1500,H=1000,scale=1,ox=0,oy=0,paused=true,speed=1,started=false,gameOver=false,last=0,acc=0,selected=[],placing=null,drag=null;
-var resources={wood:600,ore:450,oil:250},enemyResources={wood:600,ore:450,oil:250},rallyPoints={p:null,e:null},techs={weapons:false,armor:false,engines:false},eras={p:0,e:0},wonderLevels={p:0,e:0},wonderChosen={p:0,e:0},wonderBuffs={p:{military:0,economy:0},e:{military:0,economy:0}},eraNames=['石器時代','封建時代','帝國時代','科技時代'],popCap=30,units=[],buildings=[],nodes=[],bullets=[],effects=[],nextId=1,elapsed=0,aiTimer=0,spawnTimer=0;
+var resources={wood:600,ore:450,oil:250},enemyResources={wood:600,ore:450,oil:250},rallyPoints={p:null,e:null},techs={weapons:false,armor:false,engines:false},eras={p:0,e:0},wonderLevels={p:0,e:0},wonderChosen={p:0,e:0},wonderBuffs={p:{military:0,economy:0},e:{military:0,economy:0}},eraNames=['石器時代','封建時代','帝國時代','科技時代'],popCap=30,units=[],buildings=[],nodes=[],bullets=[],effects=[],nextId=1,elapsed=0,aiTimer=0,spawnTimer=0,enemyWaveTimer=0;
 var ui={wood:document.getElementById('wood'),ore:document.getElementById('ore'),oil:document.getElementById('oil'),pop:document.getElementById('pop'),era:document.getElementById('era'),selection:document.getElementById('selection'),actions:document.getElementById('actions'),log:document.getElementById('log')};
 var defs={
 worker:{name:'工程平民',cost:{wood:50},time:8,hp:55,range:18,damage:4,rate:1.1,speed:65,kind:'worker',pop:1},
@@ -81,7 +81,7 @@ function makeUnit(team,type,x,y){var d=defs[type],u={id:nextId++,team:team,kind:
 function makeBuilding(team,type,x,y){var d=buildingDefs[type],b={id:nextId++,team:team,kind:'building',type:type,x:x,y:y,hp:d.hp,max:d.hp,queue:[],progress:0,active:true};buildings.push(b);return b}
 function node(type,x,y,amount){nodes.push({type:type,x:x,y:y,amount:amount,max:amount})}
 function init(){
-resources={wood:600,ore:450,oil:250};enemyResources={wood:600,ore:450,oil:250};rallyPoints={p:null,e:null};techs={weapons:false,armor:false,engines:false};eras={p:0,e:0};wonderLevels={p:0,e:0};wonderChosen={p:0,e:0};wonderBuffs={p:{military:0,economy:0},e:{military:0,economy:0}};units=[];buildings=[];nodes=[];bullets=[];effects=[];nextId=1;elapsed=0;aiTimer=0;spawnTimer=0;gameOver=false;selected=[];placing=null;popCap=30;
+resources={wood:600,ore:450,oil:250};enemyResources={wood:600,ore:450,oil:250};rallyPoints={p:null,e:null};techs={weapons:false,armor:false,engines:false};eras={p:0,e:0};wonderLevels={p:0,e:0};wonderChosen={p:0,e:0};wonderBuffs={p:{military:0,economy:0},e:{military:0,economy:0}};units=[];buildings=[];nodes=[];bullets=[];effects=[];nextId=1;elapsed=0;aiTimer=0;spawnTimer=0;enemyWaveTimer=0;gameOver=false;selected=[];placing=null;popCap=30;
 makeBuilding('p','hq',245,500);makeBuilding('p','barracks',365,425);
 for(var i=0;i<4;i++)makeUnit('p','worker',320+i*22,565+(i%2)*20);
 makeUnit('p','rifle',420,510);
@@ -177,8 +177,16 @@ var fac=eb.find(b=>b.type==='factory');if(fac&&Math.random()<.8&&countPop('e')<2
 if(elapsed>90&&!eb.some(b=>b.type==='fort')&&eras.e>=1){var fp=findOpenBuildingSpot('fort',ehq.x-210,ehq.y-120);if(fp)makeBuilding('e','fort',fp.x,fp.y)}
 }
 units.filter(u=>u.team==='e'&&u.type==='worker'&&(!u.order||u.order.type==='gather')).forEach(u=>{if(!u.order){var choices=['wood','ore','oil'].map(t=>nearestNode(u,t)).filter(Boolean).sort((a,b)=>a.amount-b.amount);var n=choices[0]||nearestNode(u,'wood');if(n){u.resource=n.type;u.order={type:'gather',node:n};}}});
-var enemyArmy=units.filter(u=>u.team==='e'&&u.type!=='worker'),myArmy=units.filter(u=>u.team==='p'&&u.type!=='worker');
-if(enemyArmy.length>6&&myArmy.length>0){enemyArmy.forEach(u=>{if(!u.order||u.order.type!=='attack'){var h=buildings.find(b=>b.team==='p'&&b.type==='hq');if(h)u.order={type:'attack',target:h.id}}})}
+var enemyArmy=units.filter(u=>u.team==='e'&&u.type!=='worker'&&u.type!=='medic');
+// 敵軍波次：不再依賴玩家是否有軍隊；每隔一段時間重新集結並發動攻勢。
+enemyWaveTimer+=dt;
+var waveInterval=enemyArmy.length>=10?30:42;
+if(enemyWaveTimer>=waveInterval&&enemyArmy.length>=5){
+ var defenses=buildings.filter(b=>b.team==='p'&&['fort','turret','bunker'].includes(b.type));
+ var eh=buildings.find(b=>b.team==='e'&&b.type==='hq');
+ var target=defenses.length&&eh?defenses.sort((a,b)=>dist(eh,a)-dist(eh,b))[0]:buildings.find(b=>b.team==='p'&&b.type==='hq');
+ if(target){enemyArmy.forEach(u=>{u.order={type:'attack',target:target.id};u.target=target.id});enemyWaveTimer=0;}
+}
 }
 function tick(dt){
 elapsed+=dt;enemyAI(dt);
