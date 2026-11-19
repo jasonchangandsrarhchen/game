@@ -29,7 +29,7 @@ button.primary{background:#785a27;border-color:#c99b45;color:#fff}button.danger{
 </head>
 <body>
 <header id="top"><div class="brand">⚔ FRONTIER COMMAND <span style="font-size:11px;opacity:.7;font-weight:600">Grok</span></div><div class="stat">木材<b id="wood">300</b></div><div class="stat">礦石<b id="ore">220</b></div><div class="stat">石油<b id="oil">100</b></div><div class="stat">人口<b id="pop">5/30</b></div><div class="stat">文明<b id="era">石器時代</b></div><div style="margin-left:auto;display:flex;gap:6px"><button id="pause">Ⅱ 暫停</button><button id="speed">速度 ×1</button><button id="save">存檔</button><button id="reset" class="danger">重開</button></div></header>
-<div id="layout"><main id="stage"><canvas id="game"></canvas><canvas id="minimap" width="180" height="120"></canvas><div id="pauseTag">PAUSED</div><div id="hint">左鍵選取單位／建築　右鍵移動、攻擊或採集　拖曳框選　｜　右下角小地圖</div><div id="overlay"><div class="modal"><h1>前線指揮官</h1><p style="font-size:13px;color:#90a8b5;margin:0 0 10px">Grok Improved Edition</p><p>四國自由混戰：藍方（你）、紅方、紫方、金方從地圖四角出發。三個 AI 國家彼此敵對，也會主動發展、爭奪中央資源並發動攻擊。</p><p>消滅其他三國主堡即可獲勝；己方主堡被摧毀則戰敗。</p><p style="font-size:12px;color:#91a3ad">操作：左鍵選取／框選　右鍵移動攻擊採集　1–0 Q W E T 建造快捷鍵　Esc 取消</p><button id="start" class="primary">開始戰役</button><button id="loadBtn" style="margin-top:6px;background:#2a3d4a">載入存檔</button></div></div></main>
+<div id="layout"><main id="stage"><canvas id="game"></canvas><canvas id="minimap" width="180" height="120"></canvas><div id="pauseTag">PAUSED</div><div id="hint">左鍵選取單位／建築　右鍵移動、攻擊或採集　拖曳框選　｜　右下角小地圖</div><div id="overlay"><div class="modal"><h1>前線指揮官</h1><p style="font-size:13px;color:#90a8b5;margin:0 0 10px">Grok Improved Edition</p><p>四國自由混戰：藍方（你）、紅方、紫方、金方從地圖四角出發。三個 AI 國家彼此敵對，也會主動發展、爭奪中央資源並發動攻擊。</p><p>消滅其他三國主堡即可獲勝；己方主堡被摧毀後，只要仍有工程平民，就能支付資源重建主堡。</p><p style="font-size:12px;color:#91a3ad">操作：左鍵選取／框選　右鍵移動攻擊採集　1–0 Q W E T 建造快捷鍵　Esc 取消</p><button id="start" class="primary">開始戰役</button><button id="loadBtn" style="margin-top:6px;background:#2a3d4a">載入存檔</button></div></div></main>
 <aside id="side"><section class="panel"><h3>指揮選單</h3><div id="selection">尚未選取單位。<div class="muted">選取平民後可建造設施；選取軍隊後可下達攻擊命令。</div></div></section><section class="panel"><h3>建造／生產</h3><div class="actions" id="actions"></div></section><section class="panel" style="grid-column:1/-1;min-height:0;display:flex;flex-direction:column"><h3>戰場情報</h3><div id="log"></div></section></aside></div>
 <script>
 (function(){
@@ -89,7 +89,7 @@ marksman:{name:'精銳神射手',cost:{wood:65,ore:45},time:14,hp:72,range:235,d
 raider:{name:'沙暴突擊車',cost:{ore:85,oil:30},time:14,hp:185,range:115,damage:24,rate:1.05,speed:95,kind:'vehicle',pop:2}
 };
 var buildingDefs={
-hq:{name:'主堡',cost:{},hp:1300,w:90,h:78,kind:'hq'},
+hq:{name:'主堡',cost:{wood:250,ore:180,oil:80},hp:1300,w:90,h:78,kind:'hq'},
 barracks:{name:'兵營',cost:{wood:130,ore:50},hp:550,w:72,h:62,kind:'barracks'},
 factory:{name:'戰車工廠',cost:{wood:150,ore:180},hp:700,w:88,h:68,kind:'factory'},
 lumber:{name:'伐木場',cost:{wood:90},hp:320,w:58,h:52,kind:'lumber'},
@@ -163,7 +163,7 @@ selected=selected.filter(o=>o&&Number(o.hp)>0);ui.wood.textContent=Math.floor(re
 try{renderActions();renderSelection()}catch(err){console.error('UI render error',err);ui.selection.textContent='介面更新錯誤：'+(err&&err.message?err.message:'未知錯誤');ui.actions.replaceChildren()}
 }
 var buildHotkeys={house:'H',wall:'T',barracks:'1',factory:'2',lumber:'3',mine:'4',power:'5',turret:'6',fort:'7',lab:'8',bunker:'9',depot:'0',cannon:'Q',missile:'W',wonder:'E'};
-function startBuild(k){var d=buildingDefs[k];if(!d||!selected.some(o=>o.team==='p'&&o.kind==='unit'&&o.type==='worker'))return;if(eras.p<minEraForBuilding(k)||!canPay(d.cost)){log('無法建造：時代或資源不足。');return}placing=k;wallStart=null;log(k==='wall'?'城牆模式：右鍵設定起點，再右鍵設定終點；Esc取消。':'選擇建造'+buildingName(k,'p')+'：按右鍵放置，Esc 取消。');renderActions()}
+function startBuild(k){var d=buildingDefs[k];if(!d||!selected.some(o=>o.team==='p'&&o.kind==='unit'&&o.type==='worker'))return;if(k==='hq'&&buildings.some(v=>v.team==='p'&&v.type==='hq')){log('主堡尚未被摧毀，無須重建。');return}if(eras.p<minEraForBuilding(k)||!canPay(d.cost)){log('無法建造：時代或資源不足。');return}placing=k;wallStart=null;log(k==='wall'?'城牆模式：右鍵設定起點，再右鍵設定終點；Esc取消。':'選擇建造'+buildingName(k,'p')+'：按右鍵放置，Esc 取消。');renderActions()}
 function renderActions(){
 var b=selected.length===1?selected[0]:null,html='';
 function btn(label,fn,disabled){var el=document.createElement('button');el.textContent=label;el.disabled=!!disabled;el.onclick=fn;ui.actions.appendChild(el)}
@@ -171,6 +171,7 @@ ui.actions.innerHTML='';
 if(placing){btn(placing==='wall'?(wallStart?'取消城牆終點':'取消城牆起點')+' [Esc':'取消建造 [Esc]',function(){placing=null;wallStart=null;renderActions()});if(placing==='wall'){var note=document.createElement('div');note.className='hint';note.textContent=wallStart?'再右鍵點擊終點，將自動連接城牆。':'右鍵點擊城牆起點。';ui.actions.appendChild(note)}return}
 if(b&&b.team==='p'&&b.kind==='unit'&&b.type==='worker'){
 var keyHint=document.createElement('div');keyHint.className='hint';keyHint.textContent='建築快捷鍵：1–0、Q/W/E、T 城牆；Esc 取消建造';ui.actions.appendChild(keyHint);
+if(!buildings.some(v=>v.team==='p'&&v.type==='hq'))btn('重建主堡 [R]\n'+costText(buildingDefs.hq.cost),function(){startBuild('hq')},!canPay(buildingDefs.hq.cost));
 Object.keys(buildingDefs).filter(k=>k!=='hq'&&eras.p>=minEraForBuilding(k)&&(k!=='wonder'||!buildings.some(v=>v.team==='p'&&v.type==='wonder'))).forEach(k=>{var d=buildingDefs[k];btn(buildingName(k,'p')+' ['+(buildHotkeys[k]||'')+']\n'+costText(d.cost),function(){startBuild(k)},!canPay(d.cost))});
 }else if(b&&b.team==='p'&&b.kind==='building'){
 if(['hq','barracks','factory'].includes(b.type)){
@@ -253,7 +254,7 @@ function autoAssignWorkerResource(u){
 }
 function nearestEnemy(u,range){var best=null,bd=range||1e9;units.concat(buildings).forEach(o=>{if(o.team!==u.team&&o.hp>0){var d=dist(u,o);if(d<bd){bd=d;best=o}}});return best}
 function rightClick(x,y){
-if(placing==='wall'){if(!wallStart){wallStart={x:x,y:y};log('城牆起點已設定，請右鍵設定終點。');return}var sx=wallStart.x,sy=wallStart.y,dx=x-sx,dy=y-sy,len=Math.hypot(dx,dy);if(len<30){log('終點距離太近，請重新設定。');return}var count=Math.max(1,Math.ceil(len/76)),angle=Math.atan2(dy,dx),d=buildingDefs.wall,points=[];for(var wi=0;wi<count;wi++){var t=(wi+.5)/count,wx=sx+dx*t,wy=sy+dy*t;if(!canBuildAt('wall',wx,wy)||buildings.some(b=>b.type==='wall'&&dist(b,{x:wx,y:wy})<58)){log('城牆路線碰到既有建築或超出地圖，請重新選擇起終點。');wallStart=null;return}points.push({x:wx,y:wy})}var total={wood:d.cost.wood*count,ore:d.cost.ore*count};if(!canPay(total)){log('資源不足：這段城牆需要 '+costText(total));wallStart=null;return}pay(total);points.forEach(p=>{var wb=makeBuilding('p','wall',p.x,p.y);wb.angle=angle});log('連續城牆完成：'+count+' 段。');placing=null;wallStart=null;updateUI();return}if(placing){var d=buildingDefs[placing];if(!canBuildAt(placing,x,y)){log('建造失敗：此處與己方／敵方建築重疊，或超出地圖範圍。');return}if(eras.p<minEraForBuilding(placing)){log('尚未進入可建造此設施的時代');return}if(!pay(d.cost)){log('資源不足');return}var built=makeBuilding('p',placing,x,y);if(placing==='wonder'){wonderLevels.p=1;built.level=1;log('世界奇觀落成！選取奇觀，選擇軍事或經濟文明加成。')}else log('完成建造：'+buildingName(placing,'p'));placing=null;updateUI();return}
+if(placing==='wall'){if(!wallStart){wallStart={x:x,y:y};log('城牆起點已設定，請右鍵設定終點。');return}var sx=wallStart.x,sy=wallStart.y,dx=x-sx,dy=y-sy,len=Math.hypot(dx,dy);if(len<30){log('終點距離太近，請重新設定。');return}var count=Math.max(1,Math.ceil(len/76)),angle=Math.atan2(dy,dx),d=buildingDefs.wall,points=[];for(var wi=0;wi<count;wi++){var t=(wi+.5)/count,wx=sx+dx*t,wy=sy+dy*t;if(!canBuildAt('wall',wx,wy)||buildings.some(b=>b.type==='wall'&&dist(b,{x:wx,y:wy})<58)){log('城牆路線碰到既有建築或超出地圖，請重新選擇起終點。');wallStart=null;return}points.push({x:wx,y:wy})}var total={wood:d.cost.wood*count,ore:d.cost.ore*count};if(!canPay(total)){log('資源不足：這段城牆需要 '+costText(total));wallStart=null;return}pay(total);points.forEach(p=>{var wb=makeBuilding('p','wall',p.x,p.y);wb.angle=angle});log('連續城牆完成：'+count+' 段。');placing=null;wallStart=null;updateUI();return}if(placing){var d=buildingDefs[placing];if(!canBuildAt(placing,x,y)){log('建造失敗：此處與己方／敵方建築重疊，或超出地圖範圍。');return}if(eras.p<minEraForBuilding(placing)){log('尚未進入可建造此設施的時代');return}if(!pay(d.cost)){log('資源不足');return}var built=makeBuilding('p',placing,x,y);if(placing==='wonder'){wonderLevels.p=1;built.level=1;log('世界奇觀落成！選取奇觀，選擇軍事或經濟文明加成。')}else if(placing==='hq'){log('主堡重建完成！你重新取得文明升級與平民生產能力。')}else log('完成建造：'+buildingName(placing,'p'));placing=null;updateUI();return}
 if(!selected.length)return;
 var friendlyBuilding=buildings.find(o=>o.team==='p'&&o.hp<o.max&&Math.hypot(o.x-x,o.y-y)<Math.max(34,Math.max(buildingDefs[o.type].w,buildingDefs[o.type].h)*.65));if(friendlyBuilding&&selected.some(u=>u.kind==='unit'&&u.type==='worker')){selected.forEach(u=>{if(u.kind==='unit'&&u.type==='worker'&&u.team==='p')u.order={type:'repair',target:friendlyBuilding.id}});log('村民開始維修：'+buildingName(friendlyBuilding.type,'p'));updateUI();return}
 var target=units.concat(buildings).find(o=>o.team!=='p'&&Math.hypot(o.x-x,o.y-y)<Math.max(22,o.kind==='building'?40:20));
@@ -265,7 +266,7 @@ selected.forEach(u=>{if(u.kind!=='unit'||u.team!=='p')return;if(target){u.order=
 function screenToWorld(cx,cy){var r=canvas.getBoundingClientRect();return{x:(cx-r.left-ox)/scale,y:(cy-r.top-oy)/scale}}
 function resize(){var r=stage.getBoundingClientRect(),dpr=Math.min(2,window.devicePixelRatio||1);canvas.width=Math.floor(r.width*dpr);canvas.height=Math.floor(r.height*dpr);ctx.setTransform(dpr,0,0,dpr,0,0);scale=Math.min(r.width/W,r.height/H);ox=(r.width-W*scale)/2;oy=(r.height-H*scale)/2;if(mini){var mr=mini.getBoundingClientRect();mini.width=Math.max(120,Math.floor(mr.width));mini.height=Math.max(80,Math.floor(mr.height))}}
 window.addEventListener('resize',resize);resize();
-window.addEventListener('keydown',e=>{if(e.repeat||e.ctrlKey||e.altKey||e.metaKey)return;var tag=(document.activeElement&&document.activeElement.tagName||'').toLowerCase();if(tag==='input'||tag==='textarea'||tag==='select')return;if(e.key==='Escape'&&placing){placing=null;wallStart=null;updateUI();return}var worker=selected.length===1&&selected[0].team==='p'&&selected[0].kind==='unit'&&selected[0].type==='worker';if(!worker||placing)return;var key=e.key.toUpperCase(),type=Object.keys(buildHotkeys).find(k=>buildHotkeys[k]===key);if(type){e.preventDefault();startBuild(type)}});
+window.addEventListener('keydown',e=>{if(e.repeat||e.ctrlKey||e.altKey||e.metaKey)return;var tag=(document.activeElement&&document.activeElement.tagName||'').toLowerCase();if(tag==='input'||tag==='textarea'||tag==='select')return;if(e.key==='Escape'&&placing){placing=null;wallStart=null;updateUI();return}var worker=selected.length===1&&selected[0].team==='p'&&selected[0].kind==='unit'&&selected[0].type==='worker';if(!worker||placing)return;var key=e.key.toUpperCase(),type=key==='R'?'hq':Object.keys(buildHotkeys).find(k=>buildHotkeys[k]===key);if(type){e.preventDefault();startBuild(type)}});
 canvas.addEventListener('contextmenu',e=>e.preventDefault());
 canvas.addEventListener('mousedown',e=>{var p=screenToWorld(e.clientX,e.clientY);if(e.button===2){rightClick(p.x,p.y);return}drag={x:p.x,y:p.y,cx:e.clientX,cy:e.clientY}});
 canvas.addEventListener('mouseup',e=>{if(!drag)return;var p=screenToWorld(e.clientX,e.clientY);if(Math.hypot(e.clientX-drag.cx,e.clientY-drag.cy)>8){var x1=Math.min(drag.x,p.x),x2=Math.max(drag.x,p.x),y1=Math.min(drag.y,p.y),y2=Math.max(drag.y,p.y);selected=units.filter(u=>u.team==='p'&&u.x>=x1&&u.x<=x2&&u.y>=y1&&u.y<=y2)}else{var hit=units.concat(buildings).filter(o=>o.team==='p'&&Math.hypot(o.x-p.x,o.y-p.y)<(o.kind==='building'?48:18)).sort((a,b)=>dist(a,p)-dist(b,p))[0];selected=hit?[hit]:[]}drag=null;updateUI()});
@@ -382,10 +383,29 @@ function enemyAI(dt){
 }
 function enemyAIFor(team,dt){
  var enemyResources=countryResources[team];
- var ehq=buildings.find(b=>b.team===team&&b.type==='hq');if(!ehq)return;
+ var ehq=buildings.find(b=>b.team===team&&b.type==='hq');
  var eb=buildings.filter(b=>b.team===team);
  var assessment=assessAI(team),mind=assessment.mind;
- var workers=units.filter(u=>u.team===team&&u.type==='worker');
+ var workers=units.filter(u=>u.team===team&&u.type==='worker'&&u.hp>0);
+ // 落後勢力可獲得有限的緊急徵用物資；只補資源、不生成免費單位，且有庫存上限。
+ mind.supply=(mind.supply||0)+dt;
+ var lowStock=enemyResources.wood<90&&enemyResources.ore<65&&enemyResources.oil<35;
+ if((mind.posture==='behind'||mind.posture==='desperate')&&lowStock&&workers.length&&mind.supply>=60){
+   mind.supply=0;
+   enemyResources.wood=Math.min(180,enemyResources.wood+35);
+   enemyResources.ore=Math.min(120,enemyResources.ore+20);
+   enemyResources.oil=Math.min(70,enemyResources.oil+10);
+   log(team+' 方陷入絕境，啟動一次緊急徵用補給（有限度）。');
+ }
+ // 主堡被摧毀但仍有工程平民時，AI 會先求生重建，而不是整個停擺。
+ if(!ehq){
+   var hqCost=buildingDefs.hq.cost;
+   if(workers.length&&Object.keys(hqCost).every(k=>(enemyResources[k]||0)>=hqCost[k])){
+     var anchor=workers.slice().sort((a,b)=>a.hp-b.hp)[0],spot=findOpenBuildingSpot('hq',anchor.x,anchor.y);
+     if(spot){Object.keys(hqCost).forEach(k=>enemyResources[k]-=hqCost[k]);makeBuilding(team,'hq',spot.x,spot.y);log(team+' 方工程平民重建了主堡，勢力尚未滅亡！');}
+   }
+   return;
+ }
  // 工人不設獨立數量上限；與玩家相同，透過主堡佇列、支付木材並佔用人口生產。
  var queuedWorkers=buildings.filter(b=>b.team===team).reduce((sum,b)=>sum+(b.queue||[]).filter(q=>q.type==='worker').length,0);
  var queuedPopNow=buildings.filter(b=>b.team===team).reduce((sum,b)=>sum+(b.queue||[]).reduce((n,q)=>n+(defs[q.type]?.pop||0),0),0);
