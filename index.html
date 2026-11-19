@@ -87,7 +87,7 @@ for(var i=0;i<4;i++)makeUnit('p','worker',320+i*22,565+(i%2)*20);
 makeUnit('p','rifle',420,510);
 makeBuilding('e','hq',1250,500);makeBuilding('e','barracks',1135,420);makeBuilding('e','fort',1030,500);
 for(var i=0;i<4;i++)makeUnit('e','worker',1160+i*18,650+(i%2)*20);
-for(var i=0;i<5;i++)makeUnit('e','rifle',1050+i*20,470+(i%2)*20);
+for(var i=0;i<3;i++)makeUnit('e','rifle',1050+i*20,470+(i%2)*20);
 var woodPatches=[[420,150],[590,235],[420,820],[620,760],[1010,155],[1040,820]];woodPatches.forEach(p=>{for(var a=0;a<3;a++)for(var b=0;b<2;b++)node('wood',p[0]+a*34,p[1]+b*38,6500)});
 var orePatches=[[680,330],[850,360],[680,650],[875,650],[1080,350],[1080,650]];orePatches.forEach(p=>{for(var a=0;a<2;a++)for(var b=0;b<2;b++)node('ore',p[0]+a*38,p[1]+b*42,7200)});
 var oilPatches=[[810,135],[955,280],[820,850],[1010,760],[560,500]];oilPatches.forEach(p=>{for(var a=0;a<2;a++)node('oil',p[0]+a*42,p[1],5600)});
@@ -180,7 +180,7 @@ function enemyAI(dt){
  var eb=buildings.filter(b=>b.team==='e');
  var workers=units.filter(u=>u.team==='e'&&u.type==='worker');
  // 經濟核心：先擴充採集人口，再按庫存缺口微調分工，避免工人每幀改行造成停工。
- if(workers.length<12&&countPop('e')<64&&aiTimer>=6){aiTimer=0;makeUnit('e','worker',ehq.x-75,ehq.y+75);workers=units.filter(u=>u.team==='e'&&u.type==='worker');}
+ if(workers.length<9&&countPop('e')<64&&elapsed>12&&aiTimer>=12){aiTimer=0;makeUnit('e','worker',ehq.x-75,ehq.y+75);workers=units.filter(u=>u.team==='e'&&u.type==='worker');}
  var targets=eras.e>=2?{wood:1150,ore:1450,oil:1050}:eras.e>=1?{wood:1050,ore:1000,oil:650}:{wood:900,ore:700,oil:350};
  if(wonderLevels.e===0)targets.wood+=350,targets.ore+=250,targets.oil+=100;
  if(wonderLevels.e===1)targets.wood+=450,targets.ore+=400,targets.oil+=250;
@@ -232,7 +232,7 @@ function enemyAI(dt){
  var pVeh=playerArmy.filter(u=>['tank','artillery','scout','heavy'].includes(u.type)).length;
  var pTotal=Math.max(1,playerArmy.length),infantryRush=pInf/pTotal>.58,vehicleRush=pVeh/pTotal>.38;
  eb.filter(b=>b.type==='barracks').forEach(b=>{
-   while(pop<cap&&b.queue.length<2){
+   while(elapsed>35&&pop<cap&&b.queue.length<1){
      var type=(vehicleRush||infantryRush)&&enemyResources.ore>=45?'rocket':'rifle';
      if(!canPayE(defs[type].cost))type='rifle';
      if(!canPayE(defs[type].cost))break;
@@ -241,7 +241,7 @@ function enemyAI(dt){
  });
  // 戰車工廠不搶基本步兵軍費；有餘裕才持續補重裝。
  eb.filter(b=>b.type==='factory').forEach(b=>{
-   if(eras.e>=2&&pop<cap&&b.queue.length<1){
+   if(elapsed>100&&eras.e>=2&&pop<cap&&b.queue.length<1){
      var type=eras.e>=3&&enemyResources.oil>=90&&enemyResources.ore>=180&&pop<cap-5?'heavy':(infantryRush?'artillery':'tank');
      if(!canPayE(defs[type].cost))type='tank';
      if(!canPayE(defs[type].cost))type='rifle';
@@ -256,8 +256,8 @@ function enemyAI(dt){
  enemyWaveTimer+=dt;
  var army=units.filter(u=>u.team==='e'&&u.type!=='worker'&&u.type!=='medic');
  // 不再要求累積到一大群才出擊：小股部隊也會持續騷擾，避免兩波後因兵力門檻卡死。
- var interval=eras.e>=2?16:eras.e>=1?18:20;
- if(enemyWaveTimer>=interval&&army.length>=1){
+ var interval=elapsed<100?55:eras.e>=2?30:eras.e>=1?40:48;
+ if(enemyWaveTimer>=interval&&army.length>=3){
    var strategic=buildings.filter(b=>b.team==='p'&&['barracks','factory','lab','lumber','mine','power'].includes(b.type));
    var defenses=buildings.filter(b=>b.team==='p'&&['fort','turret','bunker'].includes(b.type));
    var target=strategic.length?strategic.sort((a,b)=>dist(ehq,a)-dist(ehq,b))[0]:(defenses.length?defenses.sort((a,b)=>dist(ehq,a)-dist(ehq,b))[0]:buildings.find(b=>b.team==='p'&&b.type==='hq'));
