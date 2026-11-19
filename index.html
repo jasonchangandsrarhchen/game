@@ -153,6 +153,18 @@ else if(u.order&&u.order.type==='return'){var h=findById(u.order.home);if(h&&dis
 else{var threat=nearestEnemy(u,110);if(threat&&threat.kind==='unit'&&threat.type!=='worker')shoot(u,threat,d,dt)}
 return}
 var t=u.order&&u.order.type==='attack'?findById(u.order.target):nearestEnemy(u,d.range+80);
+// 敵軍不再死盯建築：附近出現玩家戰鬥單位時，立即轉入野戰並集中打擊高威脅目標。
+if(u.team==='e'){
+ var nearbyHostiles=units.filter(v=>v.team==='p'&&v.type!=='worker'&&v.type!=='medic'&&v.hp>0&&dist(u,v)<285);
+ if(nearbyHostiles.length){
+  nearbyHostiles.sort((a,b)=>{
+   var priority={rocket:0,artillery:1,medic:2,heavy:3,tank:4,rifle:5,scout:6};
+   var pa=priority[a.type]??7,pb=priority[b.type]??7;
+   return pa-pb||dist(u,a)-dist(u,b);
+  });
+  t=nearbyHostiles[0];
+ }
+}
 if(t&&t.hp>0)shoot(u,t,d,dt);else if(u.order&&u.order.type==='attack')u.order=null;
 }
 function updateBuilding(b,dt){
