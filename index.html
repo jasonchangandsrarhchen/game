@@ -179,7 +179,17 @@ selected.forEach(u=>{if(u.kind!=='unit'||u.team!=='p')return;if(target){u.order=
 }else if(u.type==='breaker'){
  ctx.fillStyle='#4b5056';ctx.fillRect(-13,-13,26,25);ctx.fillStyle='#aeb7bc';ctx.fillRect(-10,-17,20,9);ctx.fillStyle='#252d32';ctx.fillRect(-16,-9,6,16);ctx.fillRect(10,-9,6,16);ctx.fillStyle='#d6a45c';ctx.fillRect(7,-4,16,5);ctx.fillStyle='#222';ctx.fillRect(-8,10,6,8);ctx.fillRect(3,10,6,8);ctx.strokeRect(-13,-13,26,25);
 }else if(u.type==='marksman'){
- ctx.fillStyle='#425d42';ctx.beginPath();ctx.moveTo(0,-15);ctx.lineTo(10,-5);ctx.lineTo(8,10);ctx.lineTo(0,15);ctx.lineTo(-8,10);ctx.lineTo(-10,-5);ctx.closePath();ctx.fill();ctx.stroke();ctx.fillStyle='#d9dfc4';ctx.fillRect(-4,-11,8,7);ctx.fillStyle='#252b27';ctx.fillRect(-2,-4,21,3);ctx.fillStyle='#9ed18c';ctx.fillRect(5,-6,7,2);
+ // 遊俠披風與輕甲
+ ctx.fillStyle='#425d42';ctx.beginPath();ctx.moveTo(0,-15);ctx.lineTo(10,-5);ctx.lineTo(8,10);ctx.lineTo(0,15);ctx.lineTo(-8,10);ctx.lineTo(-10,-5);ctx.closePath();ctx.fill();ctx.stroke();
+ ctx.fillStyle='#d9dfc4';ctx.fillRect(-4,-11,8,7);
+ // 背負箭袋與箭矢
+ ctx.fillStyle='#79552e';ctx.fillRect(-12,-10,4,15);ctx.fillStyle='#d7c18a';for(var ai=0;ai<3;ai++){ctx.fillRect(-13+ai*2,-15,1,7)}
+ // 清楚可辨識的長弓：弓臂弧線、弓弦、搭箭
+ ctx.strokeStyle='#d6a85e';ctx.lineWidth=2.8;ctx.beginPath();ctx.moveTo(10,-14);ctx.quadraticCurveTo(23,0,10,14);ctx.stroke();
+ ctx.strokeStyle='#e8e2c9';ctx.lineWidth=1;ctx.beginPath();ctx.moveTo(10,-14);ctx.lineTo(10,14);ctx.stroke();
+ ctx.strokeStyle='#30291f';ctx.lineWidth=1.8;ctx.beginPath();ctx.moveTo(-1,0);ctx.lineTo(20,0);ctx.stroke();
+ ctx.fillStyle='#d6a85e';ctx.beginPath();ctx.moveTo(20,0);ctx.lineTo(15,-2.5);ctx.lineTo(15,2.5);ctx.closePath();ctx.fill();
+ ctx.strokeStyle='#222';ctx.lineWidth=1;ctx.strokeRect(-10,-5,20,10);
 }else if(u.type==='raider'){
  ctx.fillStyle='#7a6135';ctx.beginPath();ctx.moveTo(-16,8);ctx.lineTo(-11,-9);ctx.lineTo(9,-13);ctx.lineTo(17,-3);ctx.lineTo(12,10);ctx.closePath();ctx.fill();ctx.stroke();ctx.fillStyle='#252a2b';ctx.fillRect(-15,8,10,5);ctx.fillRect(6,8,10,5);ctx.fillStyle='#e6c16a';ctx.fillRect(-5,-8,13,5);ctx.fillStyle='#343a3b';ctx.fillRect(7,-5,13,3);ctx.fillStyle='#e9a64e';ctx.fillRect(-12,-13,5,3);
 }else if(u.type==='worker'){var n=resourceNode;if(n)u.order={type:'gather',node:n};else u.order={type:'move',x:x,y:y}}else u.order={type:'move',x:x,y:y}});
