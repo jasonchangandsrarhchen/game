@@ -199,31 +199,41 @@ function enemyAI(dt){
  if(eras.e>=1){
    if(!eb.some(b=>b.type==='factory'))buildE('factory',ehq.x-175,ehq.y-100);
    if(!eb.some(b=>b.type==='lab'))buildE('lab',ehq.x-185,ehq.y+125);
-   if(elapsed>150&&eb.filter(b=>b.type==='barracks').length<2)buildE('barracks',ehq.x-250,ehq.y+35);
+   if(elapsed>75&&eb.filter(b=>b.type==='barracks').length<2)buildE('barracks',ehq.x-250,ehq.y+35);if(elapsed>210&&eb.filter(b=>b.type==='barracks').length<3)buildE('barracks',ehq.x-290,ehq.y+125);
  }
  ew=buildings.find(b=>b.team==='e'&&b.type==='wonder');
  if(ew&&wonderLevels.e===1&&canWonderUpgrade('e',2)&&canPayE(wonderUpgradeCost(2))){payE(wonderUpgradeCost(2));wonderLevels.e=2;ew.level=2;ew.max+=500;ew.hp=Math.min(ew.max,ew.hp+500);grantWonderBuff('e','economy');}
  if(eras.e===1&&canAdvance('e',2)&&canPayE(eraCost(2)))advanceEra('e');
  if(eras.e>=2){
    if(!eb.some(b=>b.type==='depot'))buildE('depot',ehq.x-180,ehq.y+210);
-   if(elapsed>260&&eb.filter(b=>b.type==='factory').length<2)buildE('factory',ehq.x-265,ehq.y-155);
+   if(elapsed>190&&eb.filter(b=>b.type==='factory').length<2)buildE('factory',ehq.x-265,ehq.y-155);
  }
  ew=buildings.find(b=>b.team==='e'&&b.type==='wonder');
  if(ew&&wonderLevels.e===2&&canWonderUpgrade('e',3)&&canPayE(wonderUpgradeCost(3))){payE(wonderUpgradeCost(3));wonderLevels.e=3;ew.level=3;ew.max+=500;ew.hp=Math.min(ew.max,ew.hp+500);grantWonderBuff('e','military');}
  if(eras.e===2&&canAdvance('e',3)&&canPayE(eraCost(3)))advanceEra('e');
- var pop=countPop('e'),cap=48;
- // 步兵保持前線數量，並確保有足夠反裝甲火力。
+ var pop=countPop('e'),cap=64;
+ // 讀取玩家軍隊組成，動態決定反制比例；不再靠固定機率亂抽。
+ var playerArmy=units.filter(u=>u.team==='p'&&u.type!=='worker'&&u.type!=='medic');
+ var pInf=playerArmy.filter(u=>['rifle','rocket'].includes(u.type)).length;
+ var pVeh=playerArmy.filter(u=>['tank','artillery','scout','heavy'].includes(u.type)).length;
+ var pTotal=Math.max(1,playerArmy.length),infantryRush=pInf/pTotal>.58,vehicleRush=pVeh/pTotal>.38;
  eb.filter(b=>b.type==='barracks').forEach(b=>{
    if(pop<cap&&b.queue.length<3){
-     var type=eras.e>=1&&enemyResources.ore>=45&&Math.random()<.42?'rocket':'rifle';
+     var type;
+     if(vehicleRush)type='rocket';
+     else if(infantryRush)type=(eras.e>=1&&enemyResources.ore>=45?'rocket':'rifle');
+     else type=(eras.e>=1&&enemyResources.ore>=45&&enemyResources.wood<180?'rocket':'rifle');
      if(payE(defs[type].cost)){b.queue.push({type:type,remain:defs[type].time});pop+=defs[type].pop;}
    }
  });
- // 工業時代後混編戰車與遠程火砲；科技時代才投入昂貴重戰車。
+ // 戰車工廠依敵方威脅選擇兵種：大量步兵用火砲壓制，裝甲部隊用火箭兵攔截。
  eb.filter(b=>b.type==='factory').forEach(b=>{
    if(eras.e>=2&&pop<cap&&b.queue.length<2){
-     var type=eras.e>=3&&enemyResources.oil>=90&&enemyResources.ore>=180&&Math.random()<.35?'heavy':
-       (enemyResources.oil>=55&&enemyResources.ore>=130&&Math.random()<.32?'artillery':'tank');
+     var type;
+     if(eras.e>=3&&enemyResources.oil>=90&&enemyResources.ore>=180&&pop<cap-5)type='heavy';
+     else if(infantryRush||buildings.filter(x=>x.team==='p'&&['turret','bunker','fort'].includes(x.type)).length>=2)type='artillery';
+     else type=vehicleRush?'tank':'artillery';
+     if(!payE(defs[type].cost)&&type==='artillery')type='tank';
      if(payE(defs[type].cost)){b.queue.push({type:type,remain:defs[type].time});pop+=defs[type].pop;}
    }
  });
@@ -235,8 +245,10 @@ function enemyAI(dt){
  enemyWaveTimer+=dt;
  var army=units.filter(u=>u.team==='e'&&u.type!=='worker'&&u.type!=='medic'),interval=eras.e>=2?19:eras.e>=1?25:32,need=eras.e>=2?7:5;
  if(enemyWaveTimer>=interval&&army.length>=need){
+   var strategic=buildings.filter(b=>b.team==='p'&&['barracks','factory','lab','lumber','mine','power'].includes(b.type));
    var defenses=buildings.filter(b=>b.team==='p'&&['fort','turret','bunker'].includes(b.type));
-   var target=defenses.length?defenses.sort((a,b)=>dist(ehq,a)-dist(ehq,b))[0]:buildings.find(b=>b.team==='p'&&b.type==='hq');
+   // 優先拆除玩家的兵源或經濟核心；若玩家防禦過密，先集火最近的防禦設施。
+   var target=strategic.length?strategic.sort((a,b)=>dist(ehq,a)-dist(ehq,b))[0]:(defenses.length?defenses.sort((a,b)=>dist(ehq,a)-dist(ehq,b))[0]:buildings.find(b=>b.team==='p'&&b.type==='hq'));
    if(target){var squad=army.filter(u=>dist(u,rallyPoints.e)<230).slice(0,Math.max(need,Math.ceil(army.length*.72)));if(squad.length<need)squad=army.slice(0,Math.max(need,Math.ceil(army.length*.55)));squad.forEach(u=>{u.order={type:'attack',target:target.id};u.target=target.id;});enemyWaveTimer=0;log('敵軍發動第 '+(enemyWaveCount++)+' 波攻勢！');}
  }
 }
