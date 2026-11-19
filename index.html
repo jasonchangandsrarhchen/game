@@ -179,8 +179,13 @@ function enemyAI(dt){
  var ehq=buildings.find(b=>b.team==='e'&&b.type==='hq');if(!ehq)return;
  var eb=buildings.filter(b=>b.team==='e');
  var workers=units.filter(u=>u.team==='e'&&u.type==='worker');
- // 經濟核心：先擴充採集人口，再按庫存缺口微調分工，避免工人每幀改行造成停工。
- if(workers.length<9&&countPop('e')<64&&elapsed>12&&aiTimer>=12){aiTimer=0;makeUnit('e','worker',ehq.x-75,ehq.y+75);workers=units.filter(u=>u.team==='e'&&u.type==='worker');}
+ // 工人不設獨立數量上限；與玩家相同，透過主堡佇列、支付木材並佔用人口生產。
+ var queuedWorkers=buildings.filter(b=>b.team==='e').reduce((sum,b)=>sum+(b.queue||[]).filter(q=>q.type==='worker').length,0);
+ var queuedPopNow=buildings.filter(b=>b.team==='e').reduce((sum,b)=>sum+(b.queue||[]).reduce((n,q)=>n+(defs[q.type]?.pop||0),0),0);
+ var workerHQ=buildings.find(b=>b.team==='e'&&b.type==='hq');
+ if(elapsed>12&&workerHQ&&workerHQ.queue.length===0&&countPop('e')+queuedPopNow<72&&canPayE({wood:50})){
+   enemyResources.wood-=50;workerHQ.queue.push({type:'worker',remain:defs.worker.time});
+ }
  var targets=eras.e>=2?{wood:1150,ore:1450,oil:1050}:eras.e>=1?{wood:1050,ore:1000,oil:650}:{wood:900,ore:700,oil:350};
  if(wonderLevels.e===0)targets.wood+=350,targets.ore+=250,targets.oil+=100;
  if(wonderLevels.e===1)targets.wood+=450,targets.ore+=400,targets.oil+=250;
