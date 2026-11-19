@@ -242,7 +242,7 @@ function enemyAIFor(team,dt){
  function payE(c){if(!canPayE(c))return false;Object.keys(c).forEach(k=>enemyResources[k]-=c[k]);return true;}
  function buildE(type,x,y){var c=buildingDefs[type].cost;if(!payE(c))return null;var p=findOpenBuildingSpot(type,x,y);if(!p){Object.keys(c).forEach(k=>enemyResources[k]+=c[k]);return null;}var b=makeBuilding(team,type,p.x,p.y);eb.push(b);return b;}
  if(!ew&&wonderLevels[team]===0&&canWonderUpgrade(team,1)&&canPayE(wonderUpgradeCost(1))){var p=findOpenBuildingSpot('wonder',ehq.x-125,ehq.y+185);if(p){payE(wonderUpgradeCost(1));ew=makeBuilding(team,'wonder',p.x,p.y);ew.level=1;wonderLevels[team]=1;grantWonderBuff(team,'economy');}}
- if(eras[team]===0&&canAdvance('e',1)&&canPayE(eraCost(1)))advanceEra('e');
+ if(eras[team]===0&&canAdvance(team,1)&&canPayE(eraCost(1)))advanceEra(team);
  if(eras[team]>=1){
    if(!eb.some(b=>b.type==='factory'))buildE('factory',ehq.x-175,ehq.y-100);
    if(!eb.some(b=>b.type==='lab'))buildE('lab',ehq.x-185,ehq.y+125);
@@ -250,14 +250,14 @@ function enemyAIFor(team,dt){
  }
  ew=buildings.find(b=>b.team===team&&b.type==='wonder');
  if(ew&&wonderLevels[team]===1&&canWonderUpgrade(team,2)&&canPayE(wonderUpgradeCost(2))){payE(wonderUpgradeCost(2));wonderLevels[team]=2;ew.level=2;ew.max+=500;ew.hp=Math.min(ew.max,ew.hp+500);grantWonderBuff(team,'economy');}
- if(eras[team]===1&&canAdvance('e',2)&&canPayE(eraCost(2)))advanceEra('e');
+ if(eras[team]===1&&canAdvance(team,2)&&canPayE(eraCost(2)))advanceEra(team);
  if(eras[team]>=2){
    if(!eb.some(b=>b.type==='depot'))buildE('depot',ehq.x-180,ehq.y+210);
    if(elapsed>190&&eb.filter(b=>b.type==='factory').length<2)buildE('factory',ehq.x-265,ehq.y-155);
  }
  ew=buildings.find(b=>b.team===team&&b.type==='wonder');
  if(ew&&wonderLevels[team]===2&&canWonderUpgrade(team,3)&&canPayE(wonderUpgradeCost(3))){payE(wonderUpgradeCost(3));wonderLevels[team]=3;ew.level=3;ew.max+=500;ew.hp=Math.min(ew.max,ew.hp+500);grantWonderBuff(team,'military');}
- if(eras[team]===2&&canAdvance('e',3)&&canPayE(eraCost(3)))advanceEra('e');
+ if(eras[team]===2&&canAdvance(team,3)&&canPayE(eraCost(3)))advanceEra(team);
  // 軍事生產優先：兵營佇列先補滿，避免升級與防禦建築把軍費花光。
  var queuedPop=buildings.filter(b=>b.team===team).reduce((sum,b)=>sum+(b.queue||[]).reduce((n,q)=>n+(defs[q.type]?.pop||0),0),0);
  var pop=countPop(team)+queuedPop,cap=72;
