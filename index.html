@@ -1,35 +1,27 @@
 <!doctype html>
 <html lang="zh-Hant">
 <head>
-<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Frontier Command｜前線指揮官 (Grok Improved)</title>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Frontier Command - Grok Improved</title>
 <style>
-:root{color-scheme:dark;--bg:#101820;--panel:#1b2833;--line:#344653;--gold:#e5b85c;--cyan:#65c7d8}
-*{box-sizing:border-box}body{margin:0;background:#0d151c;color:#e8edf0;font:14px/1.4 system-ui,"Microsoft JhengHei",sans-serif;overflow:hidden}
-#top{height:54px;background:#17232d;border-bottom:1px solid #344653;display:flex;align-items:center;gap:18px;padding:0 14px}
-.brand{font-weight:900;letter-spacing:1px;color:#f2c66d;font-size:16px}.stat{color:#cbd6dc}.stat b{color:#fff;margin-left:4px;font-variant-numeric:tabular-nums}
-#layout{height:calc(100vh - 54px);display:grid;grid-template-columns:minmax(0,1fr) 280px}
-#stage{position:relative;min-width:0;min-height:0;background:#18251e}canvas{display:block;width:100%;height:100%;cursor:crosshair}
-#side{background:#17232d;border-left:1px solid #344653;display:flex;flex-direction:column;min-height:0}
-.panel{padding:12px;border-bottom:1px solid #344653}.panel h3{margin:0 0 9px;font-size:12px;letter-spacing:1px;color:#90a8b5;text-transform:uppercase}
-.actions{display:grid;grid-template-columns:1fr 1fr;gap:7px}
-button{background:#263946;color:#eaf0f3;border:1px solid #425866;border-radius:6px;padding:9px 7px;font-weight:700;cursor:pointer;font-size:12px}
-button:hover{background:#345064;border-color:#65c7d8}button:disabled{opacity:.35;cursor:not-allowed}
-button.primary{background:#785a27;border-color:#c99b45;color:#fff}button.danger{background:#552f30;border-color:#87494b}
-#selection{min-height:68px;color:#d9e2e7}.muted{color:#91a3ad;font-size:12px}
-#log{overflow:auto;flex:1;padding:10px;font-size:12px;color:#aebdc5}.logline{padding:5px 0;border-bottom:1px solid #263640}
-#hint{position:absolute;left:12px;bottom:12px;background:#101820d9;border:1px solid #536b71;border-radius:7px;padding:8px 11px;color:#c8d7dc;pointer-events:none;font-size:12px}
-#overlay{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;background:#081016d9;z-index:3}
-.modal{width:min(480px,90%);background:#1b2a34;border:1px solid #536b71;border-radius:12px;padding:24px;box-shadow:0 20px 80px #000}
-.modal h1{margin:0 0 8px;color:#f2c66d}.modal p{color:#b8c8d0;line-height:1.7}.modal button{width:100%;padding:13px;font-size:15px;margin-top:8px}
-#pauseTag{position:absolute;top:12px;left:12px;color:#f2c66d;font-weight:900;display:none;text-shadow:0 2px 5px #000}
-#minimap{position:absolute;right:12px;bottom:12px;width:180px;height:120px;background:#0a1218cc;border:1px solid #536b71;border-radius:6px;pointer-events:none;z-index:2}
-@media(max-width:760px){#layout{grid-template-columns:1fr;grid-template-rows:minmax(0,1fr) 220px}#side{border-left:0;border-top:1px solid #344653;display:grid;grid-template-columns:1fr 1fr;grid-template-rows:auto 1fr}#log{max-height:140px}.panel{padding:8px}.actions{grid-template-columns:repeat(3,1fr)}button{padding:7px 4px;font-size:11px}#top{gap:9px;font-size:11px}.brand{font-size:13px}#minimap{width:120px;height:80px}}
+body{font-family:system-ui,"Microsoft JhengHei",sans-serif;background:#0d151c;color:#e8edf0;display:flex;align-items:center;justify-content:center;min-height:100vh;margin:0;padding:20px}
+.card{max-width:520px;padding:32px;background:#1b2a34;border-radius:12px;border:1px solid #536b71;line-height:1.7}
+h1{color:#f2c66d;margin:0 0 12px;font-size:22px}
+code{background:#0a1218;padding:2px 6px;border-radius:4px}
+ol{padding-left:20px}
 </style>
 </head>
 <body>
-<header id="top"><div class="brand">⚔ FRONTIER COMMAND <span style="font-size:11px;opacity:.7;font-weight:600">Grok</span></div><div class="stat">木材<b id="wood">300</b></div><div class="stat">礦石<b id="ore">220</b></div><div class="stat">石油<b id="oil">100</b></div><div class="stat">人口<b id="pop">5/30</b></div><div class="stat">文明<b id="era">石器時代</b></div><div style="margin-left:auto;display:flex;gap:6px"><button id="pause">Ⅱ 暫停</button><button id="speed">速度 ×1</button><button id="save">存檔</button><button id="reset" class="danger">重開</button></div></header>
-<div id="layout"><main id="stage"><canvas id="game"></canvas><canvas id="minimap" width="180" height="120"></canvas><div id="pauseTag">PAUSED</div><div id="hint">左鍵選取單位／建築　右鍵移動、攻擊或採集　拖曳框選　｜　右下角小地圖</div><div id="overlay"><div class="modal"><h1>前線指揮官</h1><p style="font-size:13px;color:#90a8b5;margin:0 0 10px">Grok Improved Edition</p><p>四國自由混戰：藍方（你）、紅方、紫方、金方從地圖四角出發。三個 AI 國家彼此敵對，也會主動發展、爭奪中央資源並發動攻擊。</p><p>消滅其他三國主堡即可獲勝；己方主堡被摧毀則戰敗。</p><p style="font-size:12px;color:#91a3ad">操作：左鍵選取／框選　右鍵移動攻擊採集　1–0 Q W E T 建造快捷鍵　Esc 取消</p><button id="start" class="primary">開始戰役</button><button id="loadBtn" style="margin-top:6px;background:#2a3d4a">載入存檔</button></div></div></main>
-<aside id="side"><section class="panel"><h3>指揮選單</h3><div id="selection">尚未選取單位。<div class="muted">選取平民後可建造設施；選取軍隊後可下達攻擊命令。</div></div></section><section class="panel"><h3>建造／生產</h3><div class="actions" id="actions"></div></section><section class="panel" style="grid-column:1/-1;min-height:0;display:flex;flex-direction:column"><h3>戰場情報</h3><div id="log"></div></section></aside></div>
-<script src="game.js"></script>
-</body></html>
+<div class="card">
+<h1>前線指揮官 · Grok Improved</h1>
+<p>完整改進版（文明科技樹、美術、小地圖）檔案約 85KB，請用對話中的 <b>zip</b> 上傳到此 repo：</p>
+<ol>
+<li>解壓 zip，取出 <code>index.html</code></li>
+<li>開啟此 GitHub repo → Add file → Upload files</li>
+<li>拖入 <code>index.html</code>（可同時上傳 README.md）並 commit</li>
+</ol>
+<p>上傳後重新整理頁面即可遊玩。</p>
+</div>
+</body>
+</html>
