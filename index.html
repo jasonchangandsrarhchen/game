@@ -202,6 +202,22 @@ function enemyAI(dt){
  if(wonderLevels.e===2)targets.wood+=650,targets.ore+=550,targets.oil+=450;
  var assigned={wood:0,ore:0,oil:0};
  workers.forEach(u=>{if(u.order&&(u.order.type==='gather'||u.order.type==='return'))assigned[u.resource||'wood']++;});
+ // AI 自主評估中央資源：軍力足以護送、庫存吃緊或後方資源逐漸枯竭時，才派小隊前往。
+ var enemyArmy=units.filter(u=>u.team==='e'&&u.hp>0&&!['worker','medic'].includes(u.type));
+ var playerArmyNearCenter=units.filter(u=>u.team==='p'&&u.hp>0&&!['worker','medic'].includes(u.type));
+ var centerNodes=nodes.filter(n=>n.zone==='center'&&n.amount>0);
+ var centralWorkers=workers.filter(u=>u.order&&u.order.type==='gather'&&u.order.node&&u.order.node.zone==='center').length;
+ var rearLeft={wood:0,ore:0,oil:0};
+ nodes.forEach(n=>{if(n.zone==='e'&&rearLeft[n.type]!==undefined)rearLeft[n.type]+=n.amount;});
+ var centralNeed=['wood','ore','oil'].map(type=>({type,score:(1-(enemyResources[type]||0)/targets[type])+Math.max(0,1-rearLeft[type]/6500)})).sort((a,b)=>b.score-a.score);
+ var centralType=centralNeed[0].type;
+ var centralNodeFor=(u,type)=>centerNodes.filter(n=>n.type===type).sort((a,b)=>dist(u,a)-dist(u,b))[0]||null;
+ var centralCandidate=centralNodeFor(ehq,centralType);
+ var centerThreat=centralCandidate?playerArmyNearCenter.filter(u=>dist(u,centralCandidate)<210).length:0;
+ var enemyEscort=centralCandidate?enemyArmy.filter(u=>dist(u,centralCandidate)<250).length:0;
+ var canContestCenter=!!centralCandidate&&enemyArmy.length>=4&&centralWorkers<3&&
+   ((enemyResources[centralType]||0)<targets[centralType]*.82||rearLeft[centralType]<5200)&&
+   (centerThreat===0||enemyEscort>=centerThreat);
  workers.sort((a,b)=>a.id-b.id).forEach(u=>{
    if((u.carry||0)>0)return;
    var nodeNow=u.order&&u.order.type==='gather'?u.order.node:null;
@@ -210,6 +226,13 @@ function enemyAI(dt){
    if(!choices.length)return;
    choices.sort((a,b)=>(enemyResources[a]||0)/targets[a]+assigned[a]*.20-((enemyResources[b]||0)/targets[b]+assigned[b]*.20));
    var best=choices[0],switchNeeded=!nodeNow||nodeNow.amount<=0||!u.order||u.order.type!=='gather';
+   // 軍力、護送安全與資源缺口都符合時，主動派少量工人佔領中央資源；不會盲目送工人送死。
+   var centralNode=canContestCenter&&centralWorkers<3&&((u.order&&u.order.type==='gather'&&u.order.node&&u.order.node.zone==='center')||(!nodeNow&&centralWorkers<2))?centralNodeFor(u,centralType):null;
+   if(centralNode&&(!nodeNow||nodeNow.zone!=='center')&&(dist(u,centralNode)<dist(u,nearestNode(u,centralType)||ehq)+180)){
+     if(assigned[current]>0)assigned[current]--;
+     u.resource=centralType;u.order={type:'gather',node:centralNode};u.gatherTime=0;assigned[centralType]++;centralWorkers++;
+     return;
+   }
    // 只有原資源明顯過量、另一資源明顯短缺時才轉職，避免工人來回跑。
    if(!switchNeeded&&best!==current&&(enemyResources[current]||0)>targets[current]*1.25&&(enemyResources[best]||0)<targets[best]*.72)switchNeeded=true;
    var type=switchNeeded?best:current;
