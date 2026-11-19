@@ -224,33 +224,28 @@ function enemyAI(dt){
  ew=buildings.find(b=>b.team==='e'&&b.type==='wonder');
  if(ew&&wonderLevels.e===2&&canWonderUpgrade('e',3)&&canPayE(wonderUpgradeCost(3))){payE(wonderUpgradeCost(3));wonderLevels.e=3;ew.level=3;ew.max+=500;ew.hp=Math.min(ew.max,ew.hp+500);grantWonderBuff('e','military');}
  if(eras.e===2&&canAdvance('e',3)&&canPayE(eraCost(3)))advanceEra('e');
+ // 軍事生產優先：兵營佇列先補滿，避免升級與防禦建築把軍費花光。
  var queuedPop=buildings.filter(b=>b.team==='e').reduce((sum,b)=>sum+(b.queue||[]).reduce((n,q)=>n+(defs[q.type]?.pop||0),0),0);
- var pop=countPop('e')+queuedPop,cap=64;
- // 讀取玩家軍隊組成，動態決定反制比例；不再靠固定機率亂抽。
+ var pop=countPop('e')+queuedPop,cap=72;
  var playerArmy=units.filter(u=>u.team==='p'&&u.type!=='worker'&&u.type!=='medic');
  var pInf=playerArmy.filter(u=>['rifle','rocket'].includes(u.type)).length;
  var pVeh=playerArmy.filter(u=>['tank','artillery','scout','heavy'].includes(u.type)).length;
  var pTotal=Math.max(1,playerArmy.length),infantryRush=pInf/pTotal>.58,vehicleRush=pVeh/pTotal>.38;
  eb.filter(b=>b.type==='barracks').forEach(b=>{
-   if(pop<cap&&b.queue.length<3){
-     var type;
-     if(vehicleRush)type='rocket';
-     else if(infantryRush)type=(eras.e>=1&&enemyResources.ore>=45?'rocket':'rifle');
-     else type=(eras.e>=1&&enemyResources.ore>=45&&enemyResources.wood<180?'rocket':'rifle');
+   while(pop<cap&&b.queue.length<2){
+     var type=(vehicleRush||infantryRush)&&enemyResources.ore>=45?'rocket':'rifle';
      if(!canPayE(defs[type].cost))type='rifle';
-     if(payE(defs[type].cost)){b.queue.push({type:type,remain:defs[type].time});pop+=defs[type].pop;}
+     if(!canPayE(defs[type].cost))break;
+     payE(defs[type].cost);b.queue.push({type:type,remain:defs[type].time});pop+=defs[type].pop;
    }
  });
- // 戰車工廠依敵方威脅選擇兵種：大量步兵用火砲壓制，裝甲部隊用火箭兵攔截。
+ // 戰車工廠不搶基本步兵軍費；有餘裕才持續補重裝。
  eb.filter(b=>b.type==='factory').forEach(b=>{
-   if(eras.e>=2&&pop<cap&&b.queue.length<2){
-     var type;
-     if(eras.e>=3&&enemyResources.oil>=90&&enemyResources.ore>=180&&pop<cap-5)type='heavy';
-     else if(infantryRush||buildings.filter(x=>x.team==='p'&&['turret','bunker','fort'].includes(x.type)).length>=2)type='artillery';
-     else type=vehicleRush?'tank':'artillery';
+   if(eras.e>=2&&pop<cap&&b.queue.length<1){
+     var type=eras.e>=3&&enemyResources.oil>=90&&enemyResources.ore>=180&&pop<cap-5?'heavy':(infantryRush?'artillery':'tank');
      if(!canPayE(defs[type].cost))type='tank';
      if(!canPayE(defs[type].cost))type='rifle';
-     if(payE(defs[type].cost)){b.queue.push({type:type,remain:defs[type].time});pop+=defs[type].pop;}
+     if(canPayE(defs[type].cost)){payE(defs[type].cost);b.queue.push({type:type,remain:defs[type].time});pop+=defs[type].pop;}
    }
  });
  if(eras.e>=1&&eb.filter(b=>b.type==='turret').length<2)buildE('turret',ehq.x-145,ehq.y+110+eb.filter(b=>b.type==='turret').length*85);
@@ -261,15 +256,15 @@ function enemyAI(dt){
  enemyWaveTimer+=dt;
  var army=units.filter(u=>u.team==='e'&&u.type!=='worker'&&u.type!=='medic');
  // 不再要求累積到一大群才出擊：小股部隊也會持續騷擾，避免兩波後因兵力門檻卡死。
- var interval=eras.e>=2?17:eras.e>=1?21:25;
- if(enemyWaveTimer>=interval&&army.length>=2){
+ var interval=eras.e>=2?16:eras.e>=1?18:20;
+ if(enemyWaveTimer>=interval&&army.length>=1){
    var strategic=buildings.filter(b=>b.team==='p'&&['barracks','factory','lab','lumber','mine','power'].includes(b.type));
    var defenses=buildings.filter(b=>b.team==='p'&&['fort','turret','bunker'].includes(b.type));
    var target=strategic.length?strategic.sort((a,b)=>dist(ehq,a)-dist(ehq,b))[0]:(defenses.length?defenses.sort((a,b)=>dist(ehq,a)-dist(ehq,b))[0]:buildings.find(b=>b.team==='p'&&b.type==='hq'));
    if(target){
      // 每波重新集結所有可用戰鬥單位；不受舊攻擊指令或集結半徑限制。
      var squad=army.filter(u=>u.hp>0).sort((a,b)=>dist(a,rallyPoints.e)-dist(b,rallyPoints.e));
-     var sendCount=Math.max(2,Math.ceil(squad.length*(eras.e>=2?.82:.72)));
+     var sendCount=Math.max(1,squad.length);
      squad.slice(0,sendCount).forEach(u=>{u.order={type:'attack',target:target.id};u.target=target.id;});
      enemyWaveTimer=0;
      log('敵軍發動第 '+(enemyWaveCount++)+' 波攻勢！投入 '+Math.min(sendCount,squad.length)+' 支部隊。');
