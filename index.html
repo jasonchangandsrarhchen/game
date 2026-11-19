@@ -299,8 +299,8 @@ function enemyAIFor(team,dt){
  units.filter(u=>u.team===team&&u.type!=='worker'&&u.type!=='medic'&&(!u.order||u.order.type==='move')).forEach(u=>{if(dist(u,rallyPoints[team])>95)u.order={type:'move',x:rallyPoints[team].x+(Math.random()-.5)*45,y:rallyPoints[team].y+(Math.random()-.5)*55};});
  aiWaveTimers[team]+=dt;
  var army=units.filter(u=>u.team===team&&u.type!=='worker'&&u.type!=='medic');
- // 不再要求累積到一大群才出擊：小股部隊也會持續騷擾，避免兩波後因兵力門檻卡死。
- var interval=elapsed<100?55:eras[team]>=2?30:eras[team]>=1?40:48;
+ // 開局先讓玩家有時間發展：首波延後且只派少量部隊，之後逐步提高攻勢。
+ var interval=elapsed<180?95:eras[team]>=2?38:eras[team]>=1?52:68;
  if(aiWaveTimers[team]>=interval&&army.length>=3){
    var rivals=['p','e','n','s'].filter(t=>t!==team);
    var strategic=buildings.filter(b=>rivals.includes(b.team)&&['barracks','factory','lab','lumber','mine','power'].includes(b.type));
@@ -308,16 +308,24 @@ function enemyAIFor(team,dt){
    var targetPool=strategic.length?strategic:(defenses.length?defenses:buildings.filter(b=>rivals.includes(b.team)&&b.type==='hq'));
    var target=targetPool.sort((a,b)=>dist(ehq,a)-dist(ehq,b))[0];
    if(target){
-     // 每波重新集結所有可用戰鬥單位；不受舊攻擊指令或集結半徑限制。
      var squad=army.filter(u=>u.hp>0).sort((a,b)=>dist(a,rallyPoints[team])-dist(b,rallyPoints[team]));
-     var sendCount=Math.max(1,squad.length);
+     var firstWave=aiWaveCounts[team]===1;
+     var sendCount=firstWave?Math.min(4,squad.length):squad.length;
      squad.slice(0,sendCount).forEach(u=>{u.order={type:'attack',target:target.id};u.target=target.id;});
      aiWaveTimers[team]=0;
-     log('敵軍發動第 '+(aiWaveCounts[team]++)+' 波攻勢！投入 '+Math.min(sendCount,squad.length)+' 支部隊。');
+     log('敵軍發動第 '+(aiWaveCounts[team]++)+' 波攻勢！投入 '+sendCount+' 支部隊。');
    }
  }
- // 若目標已被摧毀，清掉失效攻擊指令，讓部隊回到集結點等待下一波。
- units.filter(u=>u.team===team&&u.type!=='worker'&&u.type!=='medic'&&u.order&&u.order.type==='attack'&&!findById(u.order.target)).forEach(u=>{u.order=null;});
+ // 目標被摧毀後立即選擇下一個戰略目標，保持攻勢，不再無故撤回基地。
+ var invalidAttackers=units.filter(u=>u.team===team&&u.hp>0&&u.type!=='worker'&&u.type!=='medic'&&u.order&&u.order.type==='attack'&&!findById(u.order.target));
+ if(invalidAttackers.length){
+   var rivalsNow=['p','e','n','s'].filter(t=>t!==team);
+   var nextTargets=buildings.filter(b=>rivalsNow.includes(b.team)&&b.hp>0&&['barracks','factory','lab','lumber','mine','power','fort','turret','bunker','cannon','missile','hq'].includes(b.type));
+   nextTargets.sort((a,b)=>dist(ehq,a)-dist(ehq,b));
+   var nextTarget=nextTargets[0];
+   if(nextTarget)invalidAttackers.forEach(u=>{u.order={type:'attack',target:nextTarget.id};u.target=nextTarget.id;});
+   else invalidAttackers.forEach(u=>{u.order=null;});
+ }
 }
 function tick(dt){
 elapsed+=dt;enemyAI(dt);
