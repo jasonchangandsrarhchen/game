@@ -155,7 +155,7 @@ if(!ui.actions.children.length){btn('選取平民以建造',function(){},true);b
 }
 function renderSelection(){
 if(!selected.length){ui.selection.textContent='尚未選取單位。';var tip=document.createElement('div');tip.className='muted';tip.textContent='選取平民後可建造設施；選取軍隊後可下達攻擊命令。';ui.selection.appendChild(tip);return}
-if(selected.length>1){ui.selection.textContent='已選取 '+selected.length+' 個單位';var tip=document.createElement('div');tip.className='muted';tip.textContent='右鍵移動或攻擊。選取平民可下達採集命令。';ui.selection.appendChild(tip);return}
+if(selected.length>1){var workers=selected.filter(u=>u.type==='worker'),combat=selected.filter(u=>u.type!=='worker');ui.selection.textContent='已選取 '+selected.length+' 個單位（村民 '+workers.length+'／戰鬥 '+combat.length+'）';var tip=document.createElement('div');tip.className='muted';tip.textContent='右鍵移動或攻擊；可分別排除村民或戰鬥單位。';ui.selection.appendChild(tip);var controls=document.createElement('div');controls.style.cssText='display:flex;gap:6px;margin-top:8px;flex-wrap:wrap';var keepWorkers=document.createElement('button');keepWorkers.textContent='取消選取戰鬥單位';keepWorkers.disabled=combat.length===0;keepWorkers.onclick=()=>{selected=workers.slice();updateUI()};var keepCombat=document.createElement('button');keepCombat.textContent='取消選取生產單位（村民）';keepCombat.disabled=workers.length===0;keepCombat.onclick=()=>{selected=combat.slice();updateUI()};controls.append(keepWorkers,keepCombat);ui.selection.appendChild(controls);return}
 var o=selected[0];if(!o||typeof o!=='object'){selected=[];ui.selection.textContent='尚未選取單位。';return}
 var isUnit=o.kind==='unit'||!!defs[o.type],def=isUnit?defs[o.type]:buildingDefs[o.type];
 if(!def){ui.selection.textContent='選取目標資料異常，請重新選取。';return}
@@ -439,7 +439,15 @@ units.filter(u=>u.team==='p'||fogCanSee(u.x,u.y)).forEach(u=>{
   var stride=u.moving?Math.sin(phase)*4:0;
   ctx.strokeStyle='#202a30';ctx.lineWidth=4;ctx.beginPath();ctx.moveTo(-2,5);ctx.lineTo(-4-stride,13);ctx.moveTo(3,5);ctx.lineTo(5+stride,13);ctx.stroke();
   ctx.fillStyle=u.type==='marksman'?'#425d42':u.type==='warden'?'#273b48':u.type==='breaker'?'#4b5056':({p:'#68c5e4',e:'#ec7568',n:'#b99be8',s:'#f0c45c'}[u.team]);ctx.strokeStyle='#111';ctx.lineWidth=2;
-  if(u.type==='marksman'){
+  if(u.type==='worker'){
+   // 生產單位：寬大的工作服、明顯安全帽、背負工具包與手持工具，避免與戰鬥步兵混淆。
+   ctx.fillStyle='#b58a4d';ctx.beginPath();ctx.moveTo(-8,-6);ctx.lineTo(-10,5);ctx.lineTo(-6,11);ctx.lineTo(7,10);ctx.lineTo(9,-6);ctx.closePath();ctx.fill();ctx.stroke();
+   ctx.fillStyle='#d9c29a';ctx.beginPath();ctx.arc(0,-10,4.5,0,Math.PI*2);ctx.fill();ctx.stroke();
+   ctx.fillStyle='#e5b84f';ctx.beginPath();ctx.arc(0,-13,6,Math.PI,Math.PI*2);ctx.lineTo(6,-11);ctx.lineTo(-6,-11);ctx.closePath();ctx.fill();ctx.stroke();
+   ctx.fillStyle='#684b32';ctx.fillRect(-11,-5,5,11);ctx.strokeRect(-11,-5,5,11);
+   ctx.strokeStyle='#d5d0b9';ctx.lineWidth=2.5;ctx.beginPath();ctx.moveTo(5,-1);ctx.lineTo(12,7);ctx.stroke();ctx.strokeStyle='#7d8b91';ctx.lineWidth=3;ctx.beginPath();ctx.moveTo(10,5);ctx.lineTo(15,10);ctx.stroke();
+   ctx.fillStyle='#d5d0b9';ctx.fillRect(-4,1,8,3);
+  }else if(u.type==='marksman'){
    ctx.beginPath();ctx.moveTo(-7,-7);ctx.lineTo(-10,4);ctx.lineTo(-6,10);ctx.lineTo(5,9);ctx.lineTo(8,-6);ctx.closePath();ctx.fill();ctx.stroke();
    ctx.fillStyle='#d9dfc4';ctx.beginPath();ctx.arc(1,-9,4.5,0,Math.PI*2);ctx.fill();ctx.stroke();
    ctx.fillStyle='#79552e';ctx.fillRect(-10,-8,4,13);ctx.strokeRect(-10,-8,4,13);
@@ -456,8 +464,9 @@ units.filter(u=>u.team==='p'||fogCanSee(u.x,u.y)).forEach(u=>{
   }else if(u.type==='breaker'){
    ctx.fillRect(-10,-8,21,20);ctx.fillStyle='#aeb7bc';ctx.fillRect(-9,-16,18,9);ctx.fillStyle='#252d32';ctx.fillRect(-14,-7,7,15);ctx.fillStyle='#d6a45c';ctx.fillRect(5,-4,13,5);
   }else{
-   ctx.beginPath();ctx.ellipse(0,1,7,9,0,0,Math.PI*2);ctx.fill();ctx.stroke();ctx.fillStyle=u.type==='medic'?'#f0f0e8':'#e3d6b5';ctx.beginPath();ctx.arc(0,-9,4.5,0,Math.PI*2);ctx.fill();ctx.stroke();
-   if(u.type==='medic'){ctx.fillStyle='#fff';ctx.fillRect(-2,-3,4,9);ctx.fillRect(-5,0,10,3)}
+   // 戰鬥步兵採用較窄的裝甲胸甲與鋼盔輪廓；醫護兵保留白色醫療識別。
+   if(u.type==='medic'){ctx.beginPath();ctx.ellipse(0,1,7,9,0,0,Math.PI*2);ctx.fill();ctx.stroke();ctx.fillStyle='#f0f0e8';ctx.beginPath();ctx.arc(0,-9,4.5,0,Math.PI*2);ctx.fill();ctx.stroke();ctx.fillStyle='#fff';ctx.fillRect(-2,-3,4,9);ctx.fillRect(-5,0,10,3)}
+   else{ctx.beginPath();ctx.moveTo(-6,-7);ctx.lineTo(6,-7);ctx.lineTo(8,5);ctx.lineTo(4,10);ctx.lineTo(-5,10);ctx.lineTo(-8,4);ctx.closePath();ctx.fill();ctx.stroke();ctx.fillStyle='#c6d0d4';ctx.fillRect(-7,-12,14,4);ctx.fillStyle='#87969c';ctx.beginPath();ctx.arc(0,-9,5,Math.PI,Math.PI*2);ctx.fill();ctx.stroke();ctx.fillStyle='#252f35';ctx.fillRect(-10,-3,4,9);ctx.fillRect(6,-3,4,9)}
    if(u.type==='rifle'||u.type==='rocket'){ctx.strokeStyle='#263139';ctx.lineWidth=4;ctx.beginPath();ctx.moveTo(2,-1);ctx.lineTo(12,-1);ctx.stroke();ctx.strokeStyle='#d7e0e4';ctx.lineWidth=2;ctx.beginPath();ctx.moveTo(7,-2);ctx.lineTo(u.type==='rocket'?19:17,-2);ctx.stroke()}
   }
   if(['rifle','rocket','warden','breaker'].includes(u.type)){
