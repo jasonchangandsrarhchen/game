@@ -78,7 +78,7 @@ function advanceEra(team){var next=eras[team]+1,c=eraCost(next),wallet=team==='p
 function canPay(c){return Object.keys(c).every(k=>resources[k]>=c[k])}
 function pay(c){if(!canPay(c))return false;Object.keys(c).forEach(k=>resources[k]-=c[k]);return true}
 function makeUnit(team,type,x,y){var d=defs[type],u={id:nextId++,team:team,kind:'unit',type:type,x:x,y:y,hp:d.hp,max:d.hp,order:null,target:null,carry:0,resource:null,cool:Math.random(),buildQueue:[],moving:false};units.push(u);return u}
-function makeBuilding(team,type,x,y){var d=buildingDefs[type],b={id:nextId++,team:team,kind:'building',type:type,x:x,y:y,hp:d.hp,max:d.hp,queue:[],progress:0,active:true};buildings.push(b);return b}
+function makeBuilding(team,type,x,y){var d=buildingDefs[type],b={id:nextId++,team:team,kind:'building',type:type,x:x,y:y,hp:d.hp,max:d.hp,queue:[],progress:0,active:true,rallyOrder:null};buildings.push(b);return b}
 function node(type,x,y,amount){nodes.push({type:type,x:x,y:y,amount:amount,max:amount})}
 function init(){
 resources={wood:600,ore:450,oil:250};enemyResources={wood:600,ore:450,oil:250};rallyPoints={p:null,e:null};techs={weapons:false,armor:false,engines:false};eras={p:0,e:0};wonderLevels={p:0,e:0};wonderChosen={p:0,e:0};wonderBuffs={p:{military:0,economy:0},e:{military:0,economy:0}};units=[];buildings=[];nodes=[];bullets=[];effects=[];nextId=1;elapsed=0;aiTimer=0;spawnTimer=0;enemyWaveTimer=0;enemyWaveCount=1;gameOver=false;selected=[];placing=null;popCap=30;
@@ -107,6 +107,11 @@ if(placing){btn('取消建造',function(){placing=null;renderActions()});return}
 if(b&&b.team==='p'&&b.kind==='unit'&&b.type==='worker'){
 Object.keys(buildingDefs).filter(k=>k!=='hq'&&eras.p>=minEraForBuilding(k)&&(k!=='wonder'||!buildings.some(v=>v.team==='p'&&v.type==='wonder'))).forEach(k=>{var d=buildingDefs[k];btn(d.name+'\n'+costText(d.cost),function(){placing=k;log('選擇建造'+d.name+'：只能放在沒有任何建築的空地。');renderActions()},!canPay(d.cost))});
 }else if(b&&b.team==='p'&&b.kind==='building'){
+if(['hq','barracks','factory'].includes(b.type)){
+var ro=b.rallyOrder;var rallyLabel=!ro?'未設定':ro.type==='attack'?'攻擊目標':ro.type==='gather'?'資源目標':'地面座標';
+var rl=document.createElement('div');rl.className='hint';rl.textContent='生產集結：'+rallyLabel;ui.actions.appendChild(rl);
+btn('取消生產集結指令',function(){b.rallyOrder=null;log('已取消此建築的生產集結指令。');updateUI()},!ro);
+}
 if(b.type==='hq'){var next=eras.p+1;if(next<=3){var ec=eraCost(next),req=next===1?'需要兵營＋第一階段世界奇觀':next===2?'需要戰車工廠、研究所＋第二階段世界奇觀':'需要研究所、補給中心＋第三階段世界奇觀';btn('文明躍進：'+eraNames[next]+'（'+costText(ec)+'）',function(){if(advanceEra('p'))updateUI();else log('升級條件不足：'+req+'，或資源不足。')},!canAdvance('p',next)||!canPay(ec))}}
 if(b.type==='hq'||b.type==='barracks'){btn(unitName('worker','p')+' '+costText(defs.worker.cost),function(){train(b,'worker')},!canPay(defs.worker.cost)||countPop('p')>=myCap());}
 if(b.type==='barracks'){['rifle','rocket','medic'].filter(k=>eras.p>=minEraForUnit(k)).forEach(k=>btn(unitName(k,'p')+' '+costText(defs[k].cost),function(){train(b,k)},!canPay(defs[k].cost)||countPop('p')+defs[k].pop>myCap()))}if(b.type==='fort'){btn('設為部隊集結點',function(){rallyPoints.p={x:b.x,y:b.y};log('部隊集結點已設為此堡壘');updateUI()});btn('清除集結點',function(){rallyPoints.p=null;log('已清除前線集結點');updateUI()},!rallyPoints.p)}
@@ -134,7 +139,10 @@ function rightClick(x,y){
 if(placing){var d=buildingDefs[placing];if(!canBuildAt(placing,x,y)){log('建造失敗：此處與己方／敵方建築重疊，或超出地圖範圍。');return}if(eras.p<minEraForBuilding(placing)){log('尚未進入可建造此設施的時代');return}if(!pay(d.cost)){log('資源不足');return}var built=makeBuilding('p',placing,x,y);if(placing==='wonder'){wonderLevels.p=1;built.level=1;log('世界奇觀落成！選取奇觀，選擇軍事或經濟文明加成。')}else log('完成建造：'+d.name);placing=null;updateUI();return}
 if(!selected.length)return;
 var target=units.concat(buildings).find(o=>o.team==='e'&&Math.hypot(o.x-x,o.y-y)<Math.max(22,o.kind==='building'?40:20));
-selected.forEach(u=>{if(u.kind!=='unit'||u.team!=='p')return;if(target){u.order={type:'attack',target:target.id};u.target=target.id}else if(u.type==='worker'){var n=nodes.find(n=>dist(n,{x:x,y:y})<35&&n.amount>0);if(n)u.order={type:'gather',node:n};else u.order={type:'move',x:x,y:y}}else u.order={type:'move',x:x,y:y}});
+var resourceNode=nodes.find(n=>n.amount>0&&dist(n,{x:x,y:y})<35);
+var producer=selected.length===1&&selected[0].team==='p'&&selected[0].kind==='building'&&['hq','barracks','factory'].includes(selected[0].type)?selected[0]:null;
+if(producer){if(target)producer.rallyOrder={type:'attack',target:target.id};else if(resourceNode)producer.rallyOrder={type:'gather',node:resourceNode};else producer.rallyOrder={type:'move',x:x,y:y};log(target?'生產集結：新單位將攻擊指定目標。':resourceNode?'生產集結：新工人將前往指定資源。':'已設定生產集結地點。');updateUI();return}
+selected.forEach(u=>{if(u.kind!=='unit'||u.team!=='p')return;if(target){u.order={type:'attack',target:target.id};u.target=target.id}else if(u.type==='worker'){var n=resourceNode;if(n)u.order={type:'gather',node:n};else u.order={type:'move',x:x,y:y}}else u.order={type:'move',x:x,y:y}});
 }
 function screenToWorld(cx,cy){var r=canvas.getBoundingClientRect();return{x:(cx-r.left-ox)/scale,y:(cy-r.top-oy)/scale}}
 function resize(){var r=stage.getBoundingClientRect(),dpr=Math.min(2,window.devicePixelRatio||1);canvas.width=Math.floor(r.width*dpr);canvas.height=Math.floor(r.height*dpr);ctx.setTransform(dpr,0,0,dpr,0,0);scale=Math.min(r.width/W,r.height/H);ox=(r.width-W*scale)/2;oy=(r.height-H*scale)/2}
@@ -144,7 +152,8 @@ canvas.addEventListener('mousedown',e=>{var p=screenToWorld(e.clientX,e.clientY)
 canvas.addEventListener('mouseup',e=>{if(!drag)return;var p=screenToWorld(e.clientX,e.clientY);if(Math.hypot(e.clientX-drag.cx,e.clientY-drag.cy)>8){var x1=Math.min(drag.x,p.x),x2=Math.max(drag.x,p.x),y1=Math.min(drag.y,p.y),y2=Math.max(drag.y,p.y);selected=units.filter(u=>u.team==='p'&&u.x>=x1&&u.x<=x2&&u.y>=y1&&u.y<=y2)}else{var hit=units.concat(buildings).filter(o=>o.team==='p'&&Math.hypot(o.x-p.x,o.y-p.y)<(o.kind==='building'?48:18)).sort((a,b)=>dist(a,p)-dist(b,p))[0];selected=hit?[hit]:[]}drag=null;updateUI()});
 function moveTo(o,x,y,dt){var dx=x-o.x,dy=y-o.y,d=Math.hypot(dx,dy);if(d>5){var sp=defs[o.type].speed;if(o.team==='p'&&techs.engines)sp*=1.25;var step=Math.min(d,sp*dt);o.x+=dx/d*step;o.y+=dy/d*step}}
 function findById(id){return units.concat(buildings).find(o=>o.id===id)}
-function shoot(a,t,d,dt){if(!t||t.hp<=0)return;var dd=dist(a,t);if(dd>d.range){moveTo(a,t.x,t.y,dt);return}a.cool-=dt;if(a.cool<=0){a.cool=d.rate;bullets.push({x:a.x,y:a.y,tx:t.x,ty:t.y,team:a.team,damage:d.damage,speed:340,type:a.type})}}
+function shoot(a,t,d,dt){if(!t||t.hp<=0)return;var dd=dist(a,t);if(dd>d.range){moveTo(a,t.x,t.y,dt);return}a.cool-=dt;if(a.cool<=0){a.cool=d.rate;bullets.push({x:a.x,y:a.y,tx:t.x,ty:t.y,team:a.team,source:a.id,damage:d.damage,speed:340,type:a.type})}}
+function callDefenders(threatened,attacker){if(!threatened||!attacker||attacker.kind!=='unit'||attacker.type==='worker'||attacker.type==='medic')return;var side=threatened.team;var hostiles=units.filter(v=>v.team!==side&&v.hp>0&&v.type!=='worker'&&v.type!=='medic'&&dist(v,threatened)<310);if(!hostiles.length)return;hostiles.sort((a,b)=>{var aa=a.id===attacker.id?-1:0,bb=b.id===attacker.id?-1:0;return aa-bb||a.hp-b.hp||dist(threatened,a)-dist(threatened,b)});var focus=hostiles[0];units.filter(u=>u.team===side&&u.hp>0&&u.type!=='worker'&&u.type!=='medic'&&dist(u,threatened)<245).forEach(u=>{u.order={type:'attack',target:focus.id};u.target=focus.id;});}
 function updateUnit(u,dt){
 var d=defs[u.type];if(u.type==='medic'){var patient=units.filter(v=>v.team===u.team&&v!==u&&v.hp>0&&v.hp<v.max&&dist(u,v)<160).sort((a,b)=>(a.hp/a.max)-(b.hp/b.max))[0];if(patient){if(dist(u,patient)>28)moveTo(u,patient.x,patient.y,dt);else patient.hp=Math.min(patient.max,patient.hp+13*dt)}return}if(u.order&&u.order.type==='move'){moveTo(u,u.order.x,u.order.y,dt);if(Math.hypot(u.x-u.order.x,u.y-u.order.y)<7)u.order=null;return}
 if(u.type==='worker'){
@@ -168,9 +177,9 @@ if(u.team==='e'){
 if(t&&t.hp>0)shoot(u,t,d,dt);else if(u.order&&u.order.type==='attack')u.order=null;
 }
 function updateBuilding(b,dt){
-if(b.queue&&b.queue.length){var q=b.queue[0];q.remain-=dt;if(q.remain<=0){var d=buildingDefs[b.type];var rally=rallyPoints[b.team]||{x:b.x,y:b.y};makeUnit(b.team,q.type,rally.x+(Math.random()-.5)*35,rally.y+35+(Math.random()-.5)*25);b.queue.shift();if(b.team==='p')log('部隊完成：'+unitName(q.type,b.team))}}
-if(b.type==='turret'){var target=nearestEnemy(b,210);if(target){b.cool=(b.cool||0)-dt;if(b.cool<=0){b.cool=1.0;bullets.push({x:b.x,y:b.y,tx:target.x,ty:target.y,team:b.team,damage:18,speed:400,type:'turret'})}}}if(b.type==='fort'){units.forEach(u=>{if(u.team===b.team&&u.hp>0&&dist(u,b)<115)u.hp=Math.min(u.max,u.hp+7*dt)});}
-if(b.type==='bunker'){var bt=nearestEnemy(b,175);if(bt){b.cool=(b.cool||0)-dt;if(b.cool<=0){b.cool=1.25;bullets.push({x:b.x,y:b.y,tx:bt.x,ty:bt.y,team:b.team,damage:13,speed:380,type:'bunker'})}}}
+if(b.queue&&b.queue.length){var q=b.queue[0];q.remain-=dt;if(q.remain<=0){var d=buildingDefs[b.type],rally=b.rallyOrder||rallyPoints[b.team]||{x:b.x,y:b.y};var born=makeUnit(b.team,q.type,rally.x+(Math.random()-.5)*35,rally.y+35+(Math.random()-.5)*25);if(b.rallyOrder){var ro=b.rallyOrder;if(ro.type==='attack'&&findById(ro.target))born.order={type:'attack',target:ro.target};else if(ro.type==='gather'&&ro.node&&ro.node.amount>0){born.order={type:'gather',node:ro.node};born.resource=ro.node.type}else if(ro.type==='move')born.order={type:'move',x:ro.x,y:ro.y};}b.queue.shift();if(b.team==='p')log('部隊完成：'+unitName(q.type,b.team))}}
+if(b.type==='turret'){var target=nearestEnemy(b,210);if(target){b.cool=(b.cool||0)-dt;if(b.cool<=0){b.cool=1.0;bullets.push({x:b.x,y:b.y,tx:target.x,ty:target.y,team:b.team,source:b.id,damage:18,speed:400,type:'turret'})}}}if(b.type==='fort'){units.forEach(u=>{if(u.team===b.team&&u.hp>0&&dist(u,b)<115)u.hp=Math.min(u.max,u.hp+7*dt)});}
+if(b.type==='bunker'){var bt=nearestEnemy(b,175);if(bt){b.cool=(b.cool||0)-dt;if(b.cool<=0){b.cool=1.25;bullets.push({x:b.x,y:b.y,tx:bt.x,ty:bt.y,team:b.team,source:b.id,damage:13,speed:380,type:'bunker'})}}}
 if(b.type==='depot'&&b.team==='p'){units.forEach(u=>{if(u.team==='p'&&u.type!=='worker'&&dist(u,b)<100)u.hp=Math.min(u.max,u.hp+2*dt)});}
 }
 function findOpenBuildingSpot(type,x,y){for(var r=0;r<=260;r+=35){for(var a=0;a<8;a++){var ang=a*Math.PI/4,px=Math.max(45,Math.min(W-45,x+Math.cos(ang)*r)),py=Math.max(45,Math.min(H-45,y+Math.sin(ang)*r));if(canBuildAt(type,px,py))return{x:px,y:py}}}return null}
@@ -282,7 +291,7 @@ function tick(dt){
 elapsed+=dt;enemyAI(dt);
 units.slice().forEach(u=>{if(u.hp>0)updateUnit(u,dt)});
 buildings.slice().forEach(b=>{if(b.hp>0)updateBuilding(b,dt)});
-bullets.forEach(b=>{var dx=b.tx-b.x,dy=b.ty-b.y,d=Math.hypot(dx,dy),step=b.speed*dt;if(d<=step+5){var target=units.concat(buildings).filter(o=>o.team!==b.team&&o.hp>0).sort((a,c)=>Math.hypot(a.x-b.tx,a.y-b.ty)-Math.hypot(c.x-b.tx,c.y-b.ty))[0];if(target&&Math.hypot(target.x-b.tx,target.y-b.ty)<55){var damage=b.damage*(1+(wonderBuffs[b.team]?wonderBuffs[b.team].military*.15:0));if(target.team==='p'&&techs.armor&&target.kind==='unit')damage*=.8;if(b.team==='p'&&techs.weapons)damage*=1.25;target.hp-=damage;effects.push({x:b.tx,y:b.ty,t:.2});}b.dead=true}else{b.x+=dx/d*step;b.y+=dy/d*step}});bullets=bullets.filter(b=>!b.dead);
+bullets.forEach(b=>{var dx=b.tx-b.x,dy=b.ty-b.y,d=Math.hypot(dx,dy),step=b.speed*dt;if(d<=step+5){var target=units.concat(buildings).filter(o=>o.team!==b.team&&o.hp>0).sort((a,c)=>Math.hypot(a.x-b.tx,a.y-b.ty)-Math.hypot(c.x-b.tx,c.y-b.ty))[0];if(target&&Math.hypot(target.x-b.tx,target.y-b.ty)<55){var damage=b.damage*(1+(wonderBuffs[b.team]?wonderBuffs[b.team].military*.15:0));if(target.team==='p'&&techs.armor&&target.kind==='unit')damage*=.8;if(b.team==='p'&&techs.weapons)damage*=1.25;target.hp-=damage;var attacker=findById(b.source);if(target.hp>0&&attacker&&attacker.team!==target.team)callDefenders(target,attacker);effects.push({x:b.tx,y:b.ty,t:.2});}b.dead=true}else{b.x+=dx/d*step;b.y+=dy/d*step}});bullets=bullets.filter(b=>!b.dead);
 units=units.filter(u=>u.hp>0);buildings=buildings.filter(b=>b.hp>0);
 nodes.forEach(n=>{if(n.amount<=0)n.depleted=true});nodes=nodes.filter(n=>!n.depleted);
 effects.forEach(e=>e.t-=dt);effects=effects.filter(e=>e.t>0);
