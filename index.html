@@ -389,7 +389,7 @@ function enemyAIFor(team,dt){
  var workers=units.filter(u=>u.team===team&&u.type==='worker'&&u.hp>0);
  // 落後勢力可獲得有限的緊急徵用物資；只補資源、不生成免費單位，且有庫存上限。
  mind.supply=(mind.supply||0)+dt;
- var lowStock=enemyResources.wood<90&&enemyResources.ore<65&&enemyResources.oil<35;
+ var lowStock=(enemyResources.wood<90?1:0)+(enemyResources.ore<65?1:0)+(enemyResources.oil<35?1:0)>=2;
  if((mind.posture==='behind'||mind.posture==='desperate')&&lowStock&&workers.length&&mind.supply>=60){
    mind.supply=0;
    enemyResources.wood=Math.min(180,enemyResources.wood+35);
