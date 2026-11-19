@@ -167,9 +167,9 @@ function enemyAI(dt){
  var ehq=buildings.find(b=>b.team==='e'&&b.type==='hq');if(!ehq)return;
  var eb=buildings.filter(b=>b.team==='e');
  var workers=units.filter(u=>u.team==='e'&&u.type==='worker');
- // 經濟會隨時代改變：前期先木材/礦石，中後期提高礦石與石油比重。
- if(workers.length<10&&countPop('e')<48&&aiTimer>=7){aiTimer=0;makeUnit('e','worker',ehq.x-75,ehq.y+75);workers=units.filter(u=>u.team==='e'&&u.type==='worker');}
- var targets=eras.e>=2?{wood:850,ore:1100,oil:850}:eras.e>=1?{wood:850,ore:800,oil:420}:{wood:750,ore:600,oil:220};
+ // 經濟核心：先擴充採集人口，再按庫存缺口微調分工，避免工人每幀改行造成停工。
+ if(workers.length<12&&countPop('e')<64&&aiTimer>=6){aiTimer=0;makeUnit('e','worker',ehq.x-75,ehq.y+75);workers=units.filter(u=>u.team==='e'&&u.type==='worker');}
+ var targets=eras.e>=2?{wood:1150,ore:1450,oil:1050}:eras.e>=1?{wood:1050,ore:1000,oil:650}:{wood:900,ore:700,oil:350};
  if(wonderLevels.e===0)targets.wood+=350,targets.ore+=250,targets.oil+=100;
  if(wonderLevels.e===1)targets.wood+=450,targets.ore+=400,targets.oil+=250;
  if(wonderLevels.e===2)targets.wood+=650,targets.ore+=550,targets.oil+=450;
@@ -177,19 +177,20 @@ function enemyAI(dt){
  workers.forEach(u=>{if(u.order&&(u.order.type==='gather'||u.order.type==='return'))assigned[u.resource||'wood']++;});
  workers.sort((a,b)=>a.id-b.id).forEach(u=>{
    if((u.carry||0)>0)return;
+   var nodeNow=u.order&&u.order.type==='gather'?u.order.node:null;
+   var current=u.resource||'wood';
    var choices=['wood','ore','oil'].filter(t=>nearestNode(u,t));
    if(!choices.length)return;
-   // 庫存越低、相對目標缺口越大，就分配更多工人；不是永久固定比例。
-   choices.sort((a,b)=>(enemyResources[a]||0)/targets[a]+assigned[a]*0.16-((enemyResources[b]||0)/targets[b]+assigned[b]*0.16));
-   var type=choices[0],nodeNow=u.order&&u.order.type==='gather'?u.order.node:null;
-   if(u.resource!==type||!nodeNow||nodeNow.amount<=0){
-     var n=nearestNode(u,type);
-     if(n){if(u.resource&&assigned[u.resource]>0)assigned[u.resource]--;u.resource=type;u.order={type:'gather',node:n};u.gatherTime=0;assigned[type]++;}
-   }
+   choices.sort((a,b)=>(enemyResources[a]||0)/targets[a]+assigned[a]*.20-((enemyResources[b]||0)/targets[b]+assigned[b]*.20));
+   var best=choices[0],switchNeeded=!nodeNow||nodeNow.amount<=0||!u.order||u.order.type!=='gather';
+   // 只有原資源明顯過量、另一資源明顯短缺時才轉職，避免工人來回跑。
+   if(!switchNeeded&&best!==current&&(enemyResources[current]||0)>targets[current]*1.25&&(enemyResources[best]||0)<targets[best]*.72)switchNeeded=true;
+   var type=switchNeeded?best:current;
+   if(switchNeeded){var n=nearestNode(u,type);if(n){if(assigned[current]>0)assigned[current]--;u.resource=type;u.order={type:'gather',node:n};u.gatherTime=0;assigned[type]++;}}
  });
  var eco=[['lumber','wood'],['mine','ore'],['power','oil']];
- eco.forEach(pair=>{if(!eb.some(b=>b.type===pair[0])){var n=nodes.filter(n=>n.type===pair[1]&&n.amount>0).sort((a,b)=>dist(ehq,a)-dist(ehq,b))[0],c=buildingDefs[pair[0]].cost;
- if(n&&Object.keys(c).every(k=>(enemyResources[k]||0)>=c[k])){var p=findOpenBuildingSpot(pair[0],n.x-55,n.y+48);if(p){Object.keys(c).forEach(k=>enemyResources[k]-=c[k]);makeBuilding('e',pair[0],p.x,p.y);eb.push(buildings[buildings.length-1]);}}}});
+ eco.forEach(pair=>{var have=eb.filter(b=>b.type===pair[0]).length,desired=eras.e>=2?2:1;if(have<desired){var n=nodes.filter(n=>n.type===pair[1]&&n.amount>0).sort((a,b)=>dist(ehq,a)-dist(ehq,b))[have%Math.max(1,nodes.filter(n=>n.type===pair[1]&&n.amount>0).length)],c=buildingDefs[pair[0]].cost;
+ if(n&&Object.keys(c).every(k=>(enemyResources[k]||0)>=c[k])){var p=findOpenBuildingSpot(pair[0],n.x-55-(have*35),n.y+48+(have*25));if(p){Object.keys(c).forEach(k=>enemyResources[k]-=c[k]);var made=makeBuilding('e',pair[0],p.x,p.y);eb.push(made);}}}});
  var ew=buildings.find(b=>b.team==='e'&&b.type==='wonder');
  function canPayE(c){return Object.keys(c).every(k=>(enemyResources[k]||0)>=c[k]);}
  function payE(c){if(!canPayE(c))return false;Object.keys(c).forEach(k=>enemyResources[k]-=c[k]);return true;}
@@ -211,7 +212,8 @@ function enemyAI(dt){
  ew=buildings.find(b=>b.team==='e'&&b.type==='wonder');
  if(ew&&wonderLevels.e===2&&canWonderUpgrade('e',3)&&canPayE(wonderUpgradeCost(3))){payE(wonderUpgradeCost(3));wonderLevels.e=3;ew.level=3;ew.max+=500;ew.hp=Math.min(ew.max,ew.hp+500);grantWonderBuff('e','military');}
  if(eras.e===2&&canAdvance('e',3)&&canPayE(eraCost(3)))advanceEra('e');
- var pop=countPop('e'),cap=64;
+ var queuedPop=buildings.filter(b=>b.team==='e').reduce((sum,b)=>sum+(b.queue||[]).reduce((n,q)=>n+(defs[q.type]?.pop||0),0),0);
+ var pop=countPop('e')+queuedPop,cap=64;
  // 讀取玩家軍隊組成，動態決定反制比例；不再靠固定機率亂抽。
  var playerArmy=units.filter(u=>u.team==='p'&&u.type!=='worker'&&u.type!=='medic');
  var pInf=playerArmy.filter(u=>['rifle','rocket'].includes(u.type)).length;
@@ -223,6 +225,7 @@ function enemyAI(dt){
      if(vehicleRush)type='rocket';
      else if(infantryRush)type=(eras.e>=1&&enemyResources.ore>=45?'rocket':'rifle');
      else type=(eras.e>=1&&enemyResources.ore>=45&&enemyResources.wood<180?'rocket':'rifle');
+     if(!canPayE(defs[type].cost))type='rifle';
      if(payE(defs[type].cost)){b.queue.push({type:type,remain:defs[type].time});pop+=defs[type].pop;}
    }
  });
@@ -233,7 +236,8 @@ function enemyAI(dt){
      if(eras.e>=3&&enemyResources.oil>=90&&enemyResources.ore>=180&&pop<cap-5)type='heavy';
      else if(infantryRush||buildings.filter(x=>x.team==='p'&&['turret','bunker','fort'].includes(x.type)).length>=2)type='artillery';
      else type=vehicleRush?'tank':'artillery';
-     if(!payE(defs[type].cost)&&type==='artillery')type='tank';
+     if(!canPayE(defs[type].cost))type='tank';
+     if(!canPayE(defs[type].cost))type='rifle';
      if(payE(defs[type].cost)){b.queue.push({type:type,remain:defs[type].time});pop+=defs[type].pop;}
    }
  });
