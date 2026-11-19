@@ -169,12 +169,19 @@ function enemyAI(dt){
  var workers=units.filter(u=>u.team==='e'&&u.type==='worker');
  var desired={wood:3,ore:2,oil:2};
  if(workers.length<7&&countPop('e')<48&&aiTimer>=9){aiTimer=0;makeUnit('e','worker',ehq.x-75,ehq.y+75);workers=units.filter(u=>u.team==='e'&&u.type==='worker');}
- var assigned={wood:0,ore:0,oil:0};
- workers.forEach(u=>{if(u.order&&(u.order.type==='gather'||u.order.type==='return'))assigned[u.resource||'wood']++;});
- workers.forEach(u=>{if(!u.order||u.order.type==='gather'&&(!u.order.node||u.order.node.amount<=0)){
-   var choices=['wood','ore','oil'].sort((a,b)=>assigned[a]/desired[a]-assigned[b]/desired[b]);
-   var type=choices.find(t=>nearestNode(u,t));if(type){u.resource=type;u.order={type:'gather',node:nearestNode(u,type)};assigned[type]++;}
- }});
+ // 固定分工，避免工人一開始被資源比例判斷帶偏後，長期只採同一種資源。
+ var workPlan=['wood','ore','oil','wood','ore','wood','oil'];
+ workers.sort((a,b)=>a.id-b.id).forEach((u,i)=>{
+   var type=workPlan[i%workPlan.length];
+   // 身上有貨時先送回基地，不中斷運輸；空手時修正採集目標。
+   if((u.carry||0)<=0){
+     var nodeNow=u.order&&u.order.type==='gather'?u.order.node:null;
+     if(u.resource!==type||!nodeNow||nodeNow.amount<=0){
+       var n=nearestNode(u,type);
+       if(n){u.resource=type;u.order={type:'gather',node:n};u.gatherTime=0;}
+     }
+   }
+ });
  var eco=[['lumber','wood'],['mine','ore'],['power','oil']];
  eco.forEach(pair=>{if(!eb.some(b=>b.type===pair[0])){var n=nodes.filter(n=>n.type===pair[1]&&n.amount>0).sort((a,b)=>dist(ehq,a)-dist(ehq,b))[0],c=buildingDefs[pair[0]].cost;
  if(n&&Object.keys(c).every(k=>(enemyResources[k]||0)>=c[k])){var p=findOpenBuildingSpot(pair[0],n.x-55,n.y+48);if(p){Object.keys(c).forEach(k=>enemyResources[k]-=c[k]);makeBuilding('e',pair[0],p.x,p.y);eb.push(buildings[buildings.length-1]);}}}});
