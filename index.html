@@ -939,7 +939,7 @@ bullets.forEach(b=>{
   ctx.strokeStyle={p:'#a9edff',e:'#ff9c80',n:'#d7b9ff',s:'#ffe08a'}[b.team]||'#fff';
   ctx.lineWidth=b.splash?4:2.8;ctx.beginPath();ctx.moveTo(b.x,b.y);ctx.lineTo(b.x-(b.tx-b.x)*.07,b.y-(b.ty-b.y)*.07);ctx.stroke();
 });
-effects.forEach(e=>{ctx.strokeStyle=e.explosion?'#ffb45f':'#ffe39b';ctx.lineWidth=e.explosion?3:2;ctx.beginPath();ctx.arc(e.x,e.y,(e.radius||14)*(1-e.t/(e.explosion?.38:.25)),0,7);ctx.stroke()});
+effects.forEach(e=>{var duration=e.explosion?.38:.25,baseRadius=Number.isFinite(e.radius)&&e.radius>0?e.radius:14,life=Number.isFinite(e.t)?Math.max(0,Math.min(1,e.t/duration)):0,drawRadius=Math.max(0,baseRadius*(1-life));if(!Number.isFinite(drawRadius)||drawRadius<=0)return;ctx.strokeStyle=e.explosion?'#ffb45f':'#ffe39b';ctx.lineWidth=e.explosion?3:2;ctx.beginPath();ctx.arc(e.x,e.y,drawRadius,0,7);ctx.stroke()});
 
 /* ===== Placement / selection box ===== */
 if(drag){ctx.strokeStyle='#ffe38c';ctx.setLineDash([6,4]);ctx.strokeRect(Math.min(drag.x,mouse.x),Math.min(drag.y,mouse.y),Math.abs(mouse.x-drag.x),Math.abs(mouse.y-drag.y));ctx.setLineDash([])}
