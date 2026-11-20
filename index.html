@@ -192,7 +192,7 @@ function node(type,x,y,amount){var zone=x<W/2?(y<H/2?'p':'n'):(y<H/2?'e':'s');if
 function init(){
 fogSeen.fill(0);fogNow.fill(0);fogTimer=0;
 teamPrograms={p:0,e:0,n:0,s:0};teamUnitLevels={p:{},e:{},n:{},s:{}};resources={food:600,wood:450,gold:250};enemyResources={food:600,wood:450,gold:250};countryResources={p:resources,e:{food:600,wood:450,gold:250},n:{food:600,wood:450,gold:250},s:{food:600,wood:450,gold:250}};
-rallyPoints={p:null,e:null,n:null,s:null};techs=emptyTechs();eras={p:0,e:0,n:0,s:0};wonderLevels={p:0,e:0,n:0,s:0};wonderChosen={p:0,e:0,n:0,s:0};wonderBuffs={p:{military:0,economy:0},e:{military:0,economy:0},n:{military:0,economy:0},s:{military:0,economy:0}};aiWaveTimers={e:0,n:0,s:0};aiWaveCounts={e:1,n:1,s:1};aiMind={e:{raid:0,posture:'balanced'},n:{raid:0,posture:'balanced'},s:{raid:0,posture:'balanced'}};aiIntel={coalition:false,leader:null,goldmine:{}};units=[];buildings=[];nodes=[];bullets=[];effects=[];nextId=1;elapsed=0;aiTimer=0;spawnTimer=0;enemyWaveTimer=0;enemyWaveCount=1;gameOver=false;selected=[];placing=null;popCap=30;
+rallyPoints={p:null,e:null,n:null,s:null};techs=emptyTechs();eras={p:0,e:0,n:0,s:0};wonderLevels={p:0,e:0,n:0,s:0};wonderChosen={p:0,e:0,n:0,s:0};wonderBuffs={p:{military:0,economy:0},e:{military:0,economy:0},n:{military:0,economy:0},s:{military:0,economy:0}};aiWaveTimers={e:0,n:0,s:0};aiWaveCounts={e:1,n:1,s:1};aiMind={e:{raid:0,posture:'balanced'},n:{raid:0,posture:'balanced'},s:{raid:0,posture:'balanced'}};aiIntel={coalition:false,leader:null,power:{},goldmine:{}};units=[];buildings=[];nodes=[];bullets=[];effects=[];nextId=1;elapsed=0;aiTimer=0;spawnTimer=0;enemyWaveTimer=0;enemyWaveCount=1;gameOver=false;selected=[];placing=null;popCap=30;
 var bases={p:{x:180*MAP_SCALE,y:180*MAP_SCALE,dx:1,dy:1},e:{x:1320*MAP_SCALE,y:180*MAP_SCALE,dx:-1,dy:1},n:{x:180*MAP_SCALE,y:820*MAP_SCALE,dx:1,dy:-1},s:{x:1320*MAP_SCALE,y:820*MAP_SCALE,dx:-1,dy:-1}};
 Object.keys(bases).forEach(team=>{var q=bases[team];makeBuilding(team,'hq',q.x,q.y);makeBuilding(team,'barracks',q.x+q.dx*112*MAP_SCALE,q.y+q.dy*65*MAP_SCALE);if(team!=='p')makeBuilding(team,'fort',q.x+q.dx*205*MAP_SCALE,q.y+q.dy*5*MAP_SCALE);for(var i=0;i<4;i++)makeUnit(team,'worker',q.x+q.dx*(70+i*17)*MAP_SCALE,q.y+q.dy*(95+(i%2)*18)*MAP_SCALE);for(var j=0;j<(team==='p'?1:3);j++)makeUnit(team,'rifle',q.x+q.dx*(155+j*18)*MAP_SCALE,q.y+q.dy*(45+(j%2)*18)*MAP_SCALE);});
 var patches=[['food',[[360,90],[90,360],[1140,90],[1410,360],[360,910],[90,640],[1140,910],[1410,640],[700,300],[800,700]],3,2,34,38,6500],['wood',[[430,280],[280,430],[1070,280],[1220,430],[430,720],[280,570],[1070,720],[1220,570],[680,450],[820,550]],2,2,38,42,7200],['gold',[[520,90],[90,520],[980,90],[1410,520],[520,910],[90,480],[980,910],[1410,480],[750,180],[750,820]],2,1,42,0,5600]];
@@ -446,8 +446,8 @@ function refreshStrategicIntel(){
 }
 function assessAI(team){
  var mind=aiMind[team],wallet=countryResources[team]||{food:0,wood:0,gold:0};
- var own=aiIntel.power[team]||teamPowerScore(team),enemyMax=0;
- ['p','e','n','s'].filter(t=>t!==team).forEach(t=>enemyMax=Math.max(enemyMax,aiIntel.power[t]||0));
+ var intelPower=aiIntel.power||(aiIntel.power={}),own=intelPower[team]||teamPowerScore(team),enemyMax=0;
+ ['p','e','n','s'].filter(t=>t!==team).forEach(t=>enemyMax=Math.max(enemyMax,intelPower[t]||0));
  var ownArmy=units.filter(u=>u.team===team&&u.hp>0&&!['worker','medic'].includes(u.type));
  var hq=buildings.find(b=>b.team===team&&b.type==='hq');
  var nearbyThreat=!!hq&&units.some(u=>u.team!==team&&u.hp>0&&!['worker','medic'].includes(u.type)&&dist(u,hq)<390);
