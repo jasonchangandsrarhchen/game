@@ -292,6 +292,48 @@ if(o.team==='p'){
 function findById(id){return units.concat(buildings).find(o=>o.id===id)}
 function shoot(a,t,d,dt){if(!t||t.hp<=0)return;var dd=dist(a,t),range=a.attackRange||d.range;if(dd>range){moveTo(a,t.x,t.y,dt);return}a.facing=Math.atan2(t.y-a.y,t.x-a.x);a.cool-=dt;if(a.cool<=0){a.cool=a.attackRate||d.rate;a.fireAnim=.24;var damage=a.attackDamage||d.damage,role=(a.combat&&a.combat.role)||d.role||'ranged';if(role==='melee'){if(t.kind==='building')damage*=2.25;t.hp-=damage;effects.push({x:t.x,y:t.y,t:.22,hit:true});if(t.hp>0&&t.team!==a.team)callDefenders(t,a);return;}var muzzle=a.type==='marksman'?20:a.type==='rocket'?17:a.type==='artillery'?22:15;var splash=({rocket:34,artillery:66,eng_siege:78,iron_mortar:72,ranger_ballista:58,nomad_bombard:68,cannon:82,missile:54})[a.type]||0;bullets.push({x:a.x+Math.cos(a.facing)*muzzle,y:a.y+Math.sin(a.facing)*muzzle,tx:t.x,ty:t.y,team:a.team,source:a.id,damage:damage,speed:a.type==='marksman'?430:a.type==='artillery'?260:340,type:a.type,splash:splash})}}
 function callDefenders(threatened,attacker){if(!threatened||!attacker||attacker.kind!=='unit'||attacker.type==='worker'||attacker.type==='medic')return;var side=threatened.team;var hostiles=units.filter(v=>v.team!==side&&v.hp>0&&v.type!=='worker'&&v.type!=='medic'&&dist(v,threatened)<310);if(!hostiles.length)return;hostiles.sort((a,b)=>{var aa=a.id===attacker.id?-1:0,bb=b.id===attacker.id?-1:0;return aa-bb||(a.hp/a.max)-(b.hp/b.max)||a.hp-b.hp||dist(threatened,a)-dist(threatened,b)});var focus=hostiles[0];units.filter(u=>u.team===side&&u.hp>0&&u.type!=='worker'&&u.type!=='medic'&&dist(u,threatened)<245).forEach(u=>{u.order={type:'attack',target:focus.id};u.target=focus.id;});}
+function rangedTactics(u,target,dt){
+ if(!target||target.hp<=0)return false;
+ var race=teamRaces[u.team]||'engineers',role=(u.combat&&u.combat.role)||defs[u.type].role||'ranged';
+ if(role!=='ranged'||!['nomads','rangers'].includes(race))return false;
+ var range=u.attackRange||defs[u.type].range,distToTarget=dist(u,target);
+ var hostiles=units.filter(v=>v.team!==u.team&&v.hp>0&&!['worker','medic'].includes(v.type));
+ var meleeThreats=hostiles.filter(v=>((v.combat&&v.combat.role)||defs[v.type]?.role)==='melee'&&dist(u,v)<Math.max(150,range*.72));
+ // Prioritize an approaching melee unit over a distant building or ranged target.
+ if(meleeThreats.length){
+  meleeThreats.sort((a,b)=>dist(u,a)-dist(u,b));
+  if(distToTarget>range*.92||dist(u,meleeThreats[0])<distToTarget)target=meleeThreats[0];
+  distToTarget=dist(u,target);
+ }
+ var minGap=race==='nomads'?Math.max(105,range*.57):Math.max(125,range*.68);
+ var idealGap=race==='nomads'?range*.78:range*.86;
+ var danger=meleeThreats.filter(v=>dist(u,v)<minGap+35);
+ if(danger.length||distToTarget<minGap){
+  // Move away from the weighted center of nearby enemies to avoid being surrounded.
+  var ax=0,ay=0;
+  var threats=danger.length?danger:hostiles.filter(v=>dist(u,v)<minGap+30);
+  threats.forEach(v=>{var dx=u.x-v.x,dy=u.y-v.y,len=Math.max(1,Math.hypot(dx,dy));var weight=1/(len*len);ax+=dx/len*weight;ay+=dy/len*weight;});
+  var mag=Math.hypot(ax,ay);
+  if(mag<1e-8){ax=u.x-target.x;ay=u.y-target.y;mag=Math.hypot(ax,ay)||1;}
+  var flee= race==='nomads'?Math.max(105,range*.62):Math.max(85,range*.42);
+  var tx=Math.max(35,Math.min(W-35,u.x+ax/mag*flee)),ty=Math.max(35,Math.min(H-35,u.y+ay/mag*flee));
+  moveTo(u,tx,ty,dt);
+  if(distToTarget<=range)shoot(u,target,defs[u.type],dt);
+  return true;
+ }
+ if(distToTarget>idealGap){
+  // Advance only to a firing position, never blindly run into melee range.
+  var dx=target.x-u.x,dy=target.y-u.y,len=Math.max(1,Math.hypot(dx,dy));
+  var stop=idealGap;
+  var tx=target.x-dx/len*stop,ty=target.y-dy/len*stop;
+  moveTo(u,tx,ty,dt);
+  if(distToTarget<=range)shoot(u,target,defs[u.type],dt);
+  return true;
+ }
+ // Hold the firing line and use the full range advantage.
+ if(distToTarget<=range)shoot(u,target,defs[u.type],dt);
+ return true;
+}
 function updateUnit(u,dt){
 u.fireAnim=Math.max(0,(u.fireAnim||0)-dt);u.moving=false;
 var d=defs[u.type];if(u.type==='medic'){var patient=units.filter(v=>v.team===u.team&&v!==u&&v.hp>0&&v.hp<v.max&&dist(u,v)<180).sort((a,b)=>(a.hp/a.max)-(b.hp/b.max))[0];if(patient){if(dist(u,patient)>28)moveTo(u,patient.x,patient.y,dt);else patient.hp=Math.min(patient.max,patient.hp+13*dt)}return}if(u.type!=='worker'&&u.order?.type!=='heal'&&u.hp/u.max<=.35){var healers=units.filter(v=>v.team===u.team&&v.type==='medic'&&v.hp>0).concat(buildings.filter(b=>b.team===u.team&&b.hp>0&&(b.type==='fort'||b.type==='depot')));healers=healers.filter(v=>dist(u,v)<650).sort((a,b)=>dist(u,a)-dist(u,b));if(healers.length){u.autoHealReturnOrder=u.order?Object.assign({},u.order):null;u.autoHealTarget=healers[0].id;u.order={type:'heal',target:healers[0].id};}}if(u.order&&u.order.type==='heal'){var hs=findById(u.order.target);if(!hs||hs.hp<=0||u.hp/u.max>=.82){u.order=u.autoHealReturnOrder||null;u.autoHealReturnOrder=null;u.autoHealTarget=null;}else{var radius=hs.type==='fort'||hs.type==='depot'?62:26;if(dist(u,hs)>radius)moveTo(u,hs.x,hs.y,dt);return}}if(u.order&&u.order.type==='move'){moveTo(u,u.order.x,u.order.y,dt);if(Math.hypot(u.x-u.order.x,u.y-u.order.y)<7)u.order=null;return}
@@ -320,7 +362,7 @@ if(u.team!=='p'){
   t=nearbyHostiles[0];
  }
 }
-if(t&&t.hp>0)shoot(u,t,d,dt);else if(u.order&&u.order.type==='attack')u.order=null;
+if(t&&t.hp>0){if(u.team!=='p'&&rangedTactics(u,t,dt)){}else shoot(u,t,d,dt);}else if(u.order&&u.order.type==='attack')u.order=null;
 }
 function updateBuilding(b,dt){
 if(b.queue&&b.queue.length){var q=b.queue[0];q.remain-=dt;if(q.remain<=0){var d=buildingDefs[b.type],rally=b.rallyOrder||rallyPoints[b.team]||{x:b.x,y:b.y};var born=makeUnit(b.team,q.type,rally.x+(Math.random()-.5)*35,rally.y+35+(Math.random()-.5)*25);if(b.rallyOrder){var ro=b.rallyOrder;if(ro.type==='attack'&&findById(ro.target))born.order={type:'attack',target:ro.target};else if(ro.type==='gather'&&ro.node&&ro.node.amount>0){born.order={type:'gather',node:ro.node};born.resource=ro.node.type}else if(ro.type==='move')born.order={type:'move',x:ro.x,y:ro.y};}b.queue.shift();if(b.team==='p')log('部隊完成：'+unitName(q.type,b.team))}}
