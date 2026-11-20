@@ -265,7 +265,7 @@ function setSelectedFormation(mode){
  if(mode!=='concentrated'&&mode!=='dispersed')return;
  var group=selected.filter(u=>u&&u.kind==='unit'&&u.type!=='worker'&&u.team==='p');
  if(!group.length)return;
- group.forEach(u=>{u.formationMode=mode;if(u.order&&u.order.type==='move'&&Number.isFinite(u.order.anchorX)&&Number.isFinite(u.order.anchorY)){var angle=Number.isFinite(u.order.formationAngle)?u.order.formationAngle:Math.atan2(u.order.anchorY-u.y,u.order.anchorX-u.x),offset=formationMovePoint(u.order.anchorX,u.order.anchorY,u.formationSlot||0,u.formationCount||group.length,mode,angle);u.order.x=offset.x;u.order.y=offset.y;}});
+ group.forEach((u,i)=>{u.formationMode=mode;u.formationSlot=i;u.formationCount=group.length;if(u.order&&u.order.type==='move'&&Number.isFinite(u.order.anchorX)&&Number.isFinite(u.order.anchorY)){var angle=Number.isFinite(u.order.formationAngle)?u.order.formationAngle:Math.atan2(u.order.anchorY-u.y,u.order.anchorX-u.x),offset=formationMovePoint(u.order.anchorX,u.order.anchorY,u.formationSlot,u.formationCount,mode,angle);u.order.x=offset.x;u.order.y=offset.y;}});
  log(mode==='concentrated'?'部隊隊形已切換：集中火力。':'部隊隊形已切換：分散隊形，降低範圍攻擊波及。');updateUI();
 }
 function addFormationControls(parent,group){
