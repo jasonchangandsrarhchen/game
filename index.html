@@ -4,7 +4,7 @@
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Frontier Command｜前線指揮官 (Grok Improved)</title>
 <style>
-:root{color-scheme:dark;--bg:#101820;--panel:#1b2833;--line:#344653;--gold:#e5b85c;--cyan:#65c7d8}
+:root{color-scheme:dark;--bg:#101820;--panel:#1b2833;--line:#344653;--oil:#e5b85c;--cyan:#65c7d8}
 *{box-sizing:border-box}body{margin:0;background:#0d151c;color:#e8edf0;font:14px/1.4 system-ui,"Microsoft JhengHei",sans-serif;overflow:hidden}
 #top{height:54px;background:#17232d;border-bottom:1px solid #344653;display:flex;align-items:center;gap:18px;padding:0 14px}
 .brand{font-weight:900;letter-spacing:1px;color:#f2c66d;font-size:16px}.stat{color:#cbd6dc}.stat b{color:#fff;margin-left:4px;font-variant-numeric:tabular-nums}
@@ -28,7 +28,7 @@ button.primary{background:#785a27;border-color:#c99b45;color:#fff}button.danger{
 </style>
 </head>
 <body>
-<header id="top"><div class="brand">⚔ FRONTIER COMMAND <span style="font-size:11px;opacity:.7;font-weight:600">Grok</span></div><div class="stat">木材<b id="wood">300</b></div><div class="stat">礦石<b id="ore">220</b></div><div class="stat">石油<b id="oil">100</b></div><div class="stat">人口<b id="pop">5/30</b></div><div class="stat">文明<b id="era">石器時代</b></div><div style="margin-left:auto;display:flex;gap:6px"><button id="pause">Ⅱ 暫停</button><button id="speed">速度 ×1</button><button id="save">存檔</button><button id="reset" class="danger">重開</button></div></header>
+<header id="top"><div class="brand">⚔ FRONTIER COMMAND <span style="font-size:11px;opacity:.7;font-weight:600">Grok</span></div><div class="stat">肉<b id="food">300</b></div><div class="stat">木材<b id="wood">220</b></div><div class="stat">金礦<b id="gold">100</b></div><div class="stat">人口<b id="pop">5/30</b></div><div class="stat">文明<b id="era">石器時代</b></div><div style="margin-left:auto;display:flex;gap:6px"><button id="pause">Ⅱ 暫停</button><button id="speed">速度 ×1</button><button id="save">存檔</button><button id="reset" class="danger">重開</button></div></header>
 <div id="layout"><main id="stage"><canvas id="game"></canvas><canvas id="minimap" width="180" height="120"></canvas><div id="pauseTag">PAUSED</div><div id="hint">左鍵選取單位／建築　右鍵移動、攻擊或採集　拖曳框選　｜　右下角小地圖</div><div id="overlay"><div class="modal"><h1>前線指揮官</h1><p style="font-size:13px;color:#90a8b5;margin:0 0 10px">Grok Improved Edition</p><p>四國自由混戰：藍方（你）、紅方、紫方、金方從地圖四角出發。三個 AI 國家彼此敵對，也會主動發展、爭奪中央資源並發動攻擊。</p><p>消滅其他三國主堡即可獲勝；己方主堡被摧毀後，只要仍有工程平民，就能支付資源重建主堡。</p><p style="font-size:12px;color:#91a3ad">操作：左鍵選取／框選　右鍵移動攻擊採集　1–0 Q W E T 建造快捷鍵　Esc 取消</p><button id="start" class="primary">開始戰役</button><button id="loadBtn" style="margin-top:6px;background:#2a3d4a">載入存檔</button></div></div></main>
 <aside id="side"><section class="panel"><h3>指揮選單</h3><div id="selection">尚未選取單位。<div class="muted">選取平民後可建造設施；選取軍隊後可下達攻擊命令。</div></div></section><section class="panel"><h3>建造／生產</h3><div class="actions" id="actions"></div></section><section class="panel" style="grid-column:1/-1;min-height:0;display:flex;flex-direction:column"><h3>戰場情報</h3><div id="log"></div></section></aside></div>
 <script>
@@ -69,83 +69,86 @@ var selectedRace='engineers',teamRaces={p:'engineers',e:'ironclad',n:'rangers',s
 var raceDefs={engineers:{name:'工匠聯盟',bonus:'村民採集 +35%、建造維修 +40%；建築耐久 +35%',gather:1.35,building:1.35,workerBuild:1.4,attack:1,speed:1,unique:'warden',unitName:'齒輪守衛',unitDesc:'高耐久近戰衛士；擅長守住陣線',uniqueStats:{hp:1.18,damage:1.08,speed:.94}},ironclad:{name:'鋼鐵帝國',bonus:'近戰單位傷害 +35%、生命 +20%；遠程較弱',gather:1,building:1,attack:1,speed:1,meleeDamage:1.35,meleeHp:1.2,rangedDamage:.92,unique:'breaker',unitName:'攻城破陣者',unitDesc:'重甲近戰兵；對建築造成額外破壞',uniqueStats:{hp:1.28,damage:1.18,speed:.86}},rangers:{name:'遊俠議會',bonus:'遠程單位傷害 +30%、射程 +18%；近戰較弱',gather:1,building:1,attack:1,speed:1,rangedDamage:1.3,rangedRange:1.18,meleeDamage:.88,unique:'marksman',unitName:'暮影神射手',unitDesc:'超遠射程、高單發傷害；但生命低且造價昂貴',uniqueStats:{hp:.9,damage:1.16,range:1.12,rate:1.05}},nomads:{name:'荒原游牧',bonus:'全軍移動速度 +35%；攻擊敵方單位造成傷害時，有 35% 機率掠奪 3–8 點隨機資源',gather:1.08,building:1,attack:1,speed:1.35,unique:'raider',unitName:'沙塵掠襲者',unitDesc:'高速近戰突擊騎兵；擅長快速拆除後排設施',uniqueStats:{hp:.92,damage:1.12,speed:1.22}}};
 var techDefs={
 engineers:[
-  {id:'eff_gather',name:'高效採集',desc:'資源採集效率 +25%',cost:{ore:80},era:0},
-  {id:'struct_boost',name:'結構強化',desc:'新建建築耐久 +20%',cost:{ore:100},era:0},
-  {id:'auto_repair',name:'自動維修協議',desc:'村民修理速度 +50%',cost:{oil:80},era:1},
-  {id:'mech_sync',name:'機械同步',desc:'生產速度 +15%，機械守衛攻擊 +20%',cost:{ore:150,oil:50},era:2}
+  {id:'eff_gather',name:'高效採集',desc:'資源採集效率 +25%',cost:{wood:80},era:0},
+  {id:'struct_boost',name:'結構強化',desc:'新建建築耐久 +20%',cost:{wood:100},era:0},
+  {id:'auto_repair',name:'自動維修協議',desc:'村民修理速度 +50%',cost:{gold:80},era:1},
+  {id:'mech_sync',name:'機械同步',desc:'生產速度 +15%，機械守衛攻擊 +20%',cost:{wood:150,gold:50},era:2}
 ],
 ironclad:[
-  {id:'heavy_armor',name:'厚重裝甲',desc:'所有單位受到傷害 -15%',cost:{ore:100},era:0},
-  {id:'vehicle_up',name:'車輛強化',desc:'車輛攻擊力 +20%',cost:{ore:120},era:1},
-  {id:'charge_tactics',name:'衝鋒戰術',desc:'車輛移動速度 +15%',cost:{oil:90},era:1},
-  {id:'fortress_eng',name:'堡壘工程',desc:'防禦建築耐久 +25%，攻擊 +10%',cost:{ore:140},era:2}
+  {id:'heavy_armor',name:'厚重裝甲',desc:'所有單位受到傷害 -15%',cost:{wood:100},era:0},
+  {id:'vehicle_up',name:'車輛強化',desc:'車輛攻擊力 +20%',cost:{wood:120},era:1},
+  {id:'charge_tactics',name:'衝鋒戰術',desc:'車輛移動速度 +15%',cost:{gold:90},era:1},
+  {id:'fortress_eng',name:'堡壘工程',desc:'防禦建築耐久 +25%，攻擊 +10%',cost:{wood:140},era:2}
 ],
 rangers:[
-  {id:'precise_shot',name:'精準射擊',desc:'步兵攻擊力 +18%',cost:{ore:90},era:0},
-  {id:'eagle_eye',name:'鷹眼視野',desc:'單位視野 +20%',cost:{wood:60,ore:40},era:0},
-  {id:'armor_pierce',name:'穿甲箭術',desc:'神射手與火箭兵傷害 +25%',cost:{ore:110},era:1},
-  {id:'guerrilla',name:'游擊訓練',desc:'步兵移動速度 +12%',cost:{oil:70},era:2}
+  {id:'precise_shot',name:'精準射擊',desc:'步兵攻擊力 +18%',cost:{wood:90},era:0},
+  {id:'eagle_eye',name:'鷹眼視野',desc:'單位視野 +20%',cost:{food:60,wood:40},era:0},
+  {id:'armor_pierce',name:'穿甲箭術',desc:'神射手與火箭兵傷害 +25%',cost:{wood:110},era:1},
+  {id:'guerrilla',name:'游擊訓練',desc:'步兵移動速度 +12%',cost:{gold:70},era:2}
 ],
 nomads:[
-  {id:'desert_march',name:'沙漠行軍',desc:'所有單位移動速度 +12%',cost:{oil:60},era:0},
-  {id:'plunder',name:'掠奪技巧',desc:'村民負載量 +30%',cost:{wood:50,ore:40},era:0},
-  {id:'rapid_mobilize',name:'快速動員',desc:'生產時間 -15%',cost:{ore:100},era:1},
-  {id:'sandstorm',name:'沙暴襲擊',desc:'沙暴突擊車攻擊 +25%、速度 +10%',cost:{oil:100},era:2}
+  {id:'desert_march',name:'沙漠行軍',desc:'所有單位移動速度 +12%',cost:{gold:60},era:0},
+  {id:'plunder',name:'掠奪技巧',desc:'村民負載量 +30%',cost:{food:50,wood:40},era:0},
+  {id:'rapid_mobilize',name:'快速動員',desc:'生產時間 -15%',cost:{wood:100},era:1},
+  {id:'sandstorm',name:'沙暴襲擊',desc:'沙暴突擊車攻擊 +25%、速度 +10%',cost:{gold:100},era:2}
 ]
 };
 function emptyTechs(){var t={};Object.keys(techDefs).forEach(race=>techDefs[race].forEach(td=>t[td.id]=false));t.weapons=false;t.armor=false;t.engines=false;return t}
 
 var teamPrograms={p:0,e:0,n:0,s:0};
-var teamUnitLevels={p:{},e:{},n:{},s:{}},resources={wood:600,ore:450,oil:250},enemyResources={wood:600,ore:450,oil:250},countryResources={p:resources,e:{wood:600,ore:450,oil:250},n:{wood:600,ore:450,oil:250},s:{wood:600,ore:450,oil:250}},rallyPoints={p:null,e:null,n:null,s:null},techs=emptyTechs(),eras={p:0,e:0,n:0,s:0},wonderLevels={p:0,e:0,n:0,s:0},wonderChosen={p:0,e:0,n:0,s:0},wonderBuffs={p:{military:0,economy:0},e:{military:0,economy:0},n:{military:0,economy:0},s:{military:0,economy:0}},aiWaveTimers={e:0,n:0,s:0},aiWaveCounts={e:1,n:1,s:1},aiMind={e:{raid:0,posture:'balanced'},n:{raid:0,posture:'balanced'},s:{raid:0,posture:'balanced'}},aiIntel={coalition:false,leader:null,power:{}},eraNames=['石器時代','封建時代','帝國時代','科技時代'],popCap=30,units=[],buildings=[],nodes=[],bullets=[],effects=[],nextId=1,elapsed=0,aiTimer=0,spawnTimer=0,enemyWaveTimer=0,enemyWaveCount=1;
-var ui={wood:document.getElementById('wood'),ore:document.getElementById('ore'),oil:document.getElementById('oil'),pop:document.getElementById('pop'),era:document.getElementById('era'),selection:document.getElementById('selection'),actions:document.getElementById('actions'),log:document.getElementById('log')};
+var teamUnitLevels={p:{},e:{},n:{},s:{}},resources={food:600,wood:450,gold:250},enemyResources={food:600,wood:450,gold:250},countryResources={p:resources,e:{food:600,wood:450,gold:250},n:{food:600,wood:450,gold:250},s:{food:600,wood:450,gold:250}},rallyPoints={p:null,e:null,n:null,s:null},techs=emptyTechs(),eras={p:0,e:0,n:0,s:0},wonderLevels={p:0,e:0,n:0,s:0},wonderChosen={p:0,e:0,n:0,s:0},wonderBuffs={p:{military:0,economy:0},e:{military:0,economy:0},n:{military:0,economy:0},s:{military:0,economy:0}},aiWaveTimers={e:0,n:0,s:0},aiWaveCounts={e:1,n:1,s:1},aiMind={e:{raid:0,posture:'balanced'},n:{raid:0,posture:'balanced'},s:{raid:0,posture:'balanced'}},aiIntel={coalition:false,leader:null,power:{}},eraNames=['石器時代','封建時代','帝國時代','科技時代'],popCap=30,units=[],buildings=[],nodes=[],bullets=[],effects=[],nextId=1,elapsed=0,aiTimer=0,spawnTimer=0,enemyWaveTimer=0,enemyWaveCount=1;
+var ui={food:document.getElementById('food'),wood:document.getElementById('wood'),gold:document.getElementById('gold'),pop:document.getElementById('pop'),era:document.getElementById('era'),selection:document.getElementById('selection'),actions:document.getElementById('actions'),log:document.getElementById('log')};
 var defs={
-worker:{name:'工程平民',cost:{wood:50},time:8,hp:55,range:18,damage:4,rate:1.1,speed:65,kind:'worker',pop:1},
-melee:{name:'近戰民兵',cost:{wood:25,ore:5},time:4,hp:100,range:30,damage:14,rate:.9,speed:64,kind:'infantry',role:'melee',pop:1},
-rifle:{name:'步槍兵',cost:{wood:45,ore:25},time:9,hp:75,range:145,damage:11,rate:.85,speed:58,kind:'infantry',role:'ranged',pop:1},
-rocket:{name:'火箭兵',cost:{wood:35,ore:55},time:12,hp:62,range:190,damage:25,rate:1.8,speed:48,kind:'anti',role:'ranged',pop:1},
-tank:{name:'主力戰車',cost:{ore:100,oil:35},time:15,hp:260,range:175,damage:38,rate:1.5,speed:42,kind:'vehicle',pop:3},
-artillery:{name:'自走火砲',cost:{ore:130,oil:55},time:19,hp:170,range:270,damage:65,rate:3.2,speed:28,kind:'artillery',pop:3},
-scout:{name:'偵察車',cost:{ore:55,oil:20},time:10,hp:115,range:105,damage:8,rate:.65,speed:105,kind:'vehicle',pop:2},
-medic:{name:'戰地醫護兵',cost:{wood:45,ore:35},time:11,hp:65,range:0,damage:0,rate:1,speed:54,kind:'support',pop:1},
-heavy:{name:'重型戰車',cost:{ore:180,oil:90},time:24,hp:430,range:190,damage:58,rate:1.7,speed:31,kind:'vehicle',pop:4},
-warden:{name:'機械守衛',cost:{wood:45,ore:35},time:8,hp:165,range:30,damage:22,rate:.85,speed:48,kind:'infantry',role:'melee',pop:2},
-breaker:{name:'破城重裝兵',cost:{wood:35,ore:55},time:10,hp:190,range:30,damage:30,rate:1.05,speed:40,kind:'infantry',role:'melee',pop:2},
-marksman:{name:'精銳神射手',cost:{wood:85,ore:55},time:18,hp:68,range:245,damage:34,rate:1.8,speed:50,kind:'infantry',role:'ranged',pop:2},
-raider:{name:'沙暴突擊車',cost:{ore:75,oil:20},time:12,hp:175,range:32,damage:25,rate:.8,speed:105,kind:'vehicle',role:'melee',pop:2}
+worker:{name:'工程平民',cost:{food:50},time:8,hp:55,range:18,damage:4,rate:1.1,speed:65,kind:'worker',pop:1},
+melee:{name:'近戰民兵',cost:{food:25,wood:5},time:4,hp:100,range:30,damage:14,rate:.9,speed:64,kind:'infantry',role:'melee',pop:1},
+rifle:{name:'步槍兵',cost:{food:45,wood:25},time:9,hp:75,range:145,damage:11,rate:.85,speed:58,kind:'infantry',role:'ranged',pop:1},
+rocket:{name:'火箭兵',cost:{food:35,wood:55},time:12,hp:62,range:190,damage:25,rate:1.8,speed:48,kind:'anti',role:'ranged',pop:1},
+tank:{name:'主力戰車',cost:{wood:100,gold:35},time:15,hp:260,range:175,damage:38,rate:1.5,speed:42,kind:'vehicle',pop:3},
+artillery:{name:'自走火砲',cost:{wood:130,gold:55},time:19,hp:170,range:270,damage:65,rate:3.2,speed:28,kind:'artillery',pop:3},
+scout:{name:'偵察車',cost:{wood:55,gold:20},time:10,hp:115,range:105,damage:8,rate:.65,speed:105,kind:'vehicle',pop:2},
+medic:{name:'戰地醫護兵',cost:{food:45,wood:35},time:11,hp:65,range:0,damage:0,rate:1,speed:54,kind:'support',pop:1},
+heavy:{name:'重型戰車',cost:{wood:180,gold:90},time:24,hp:430,range:190,damage:58,rate:1.7,speed:31,kind:'vehicle',pop:4},
+warden:{name:'機械守衛',cost:{food:45,wood:35},time:8,hp:165,range:30,damage:22,rate:.85,speed:48,kind:'infantry',role:'melee',pop:2},
+breaker:{name:'破城重裝兵',cost:{food:35,wood:55},time:10,hp:190,range:30,damage:30,rate:1.05,speed:40,kind:'infantry',role:'melee',pop:2},
+marksman:{name:'精銳神射手',cost:{food:85,wood:55},time:18,hp:68,range:245,damage:34,rate:1.8,speed:50,kind:'infantry',role:'ranged',pop:2},
+raider:{name:'沙暴突擊車',cost:{wood:75,gold:20},time:12,hp:175,range:32,damage:25,rate:.8,speed:105,kind:'vehicle',role:'melee',pop:2}
 };
 
 Object.assign(defs,{
- eng_repeater:{name:'連弩機械兵',cost:{wood:65,ore:35},time:11,hp:88,range:175,damage:15,rate:1,speed:55,kind:'infantry',role:'ranged',pop:1},eng_sapper:{name:'電磁爆破工兵',cost:{wood:55,ore:65},time:14,hp:92,range:42,damage:29,rate:1.35,speed:52,kind:'infantry',role:'melee',pop:2},eng_drone:{name:'蜂群偵察機',cost:{ore:75,oil:25},time:13,hp:105,range:150,damage:13,rate:.8,speed:112,kind:'vehicle',role:'ranged',pop:2},eng_walker:{name:'四足機甲',cost:{ore:145,oil:55},time:19,hp:290,range:165,damage:34,rate:1.35,speed:48,kind:'vehicle',role:'ranged',pop:3},eng_siege:{name:'磁軌攻城車',cost:{ore:170,oil:85},time:23,hp:205,range:295,damage:72,rate:3.4,speed:27,kind:'artillery',role:'ranged',pop:3},
- iron_pikeman:{name:'帝國長戟兵',cost:{wood:50,ore:30},time:10,hp:145,range:36,damage:23,rate:1,speed:48,kind:'infantry',role:'melee',pop:1},iron_crossbow:{name:'重弩破甲手',cost:{wood:55,ore:55},time:13,hp:92,range:165,damage:23,rate:1.35,speed:43,kind:'infantry',role:'ranged',pop:1},iron_ram:{name:'鋼鐵攻城槌',cost:{wood:95,ore:105},time:18,hp:370,range:34,damage:54,rate:1.5,speed:27,kind:'vehicle',role:'melee',pop:4},iron_tank:{name:'帝國重坦',cost:{ore:165,oil:65},time:21,hp:390,range:180,damage:49,rate:1.55,speed:32,kind:'vehicle',role:'ranged',pop:4},iron_mortar:{name:'重型迫擊砲車',cost:{ore:150,oil:70},time:22,hp:185,range:280,damage:78,rate:3.8,speed:25,kind:'artillery',role:'ranged',pop:3},
- ranger_blade:{name:'林地雙刃客',cost:{wood:55,ore:30},time:10,hp:90,range:32,damage:27,rate:.75,speed:82,kind:'infantry',role:'melee',pop:1},ranger_trapper:{name:'荒野陷阱師',cost:{wood:70,ore:45},time:13,hp:78,range:155,damage:18,rate:1.1,speed:62,kind:'infantry',role:'ranged',pop:1},ranger_hawk:{name:'獵鷹空騎',cost:{ore:95,oil:40},time:16,hp:145,range:145,damage:19,rate:.9,speed:125,kind:'vehicle',role:'ranged',pop:2},ranger_wind:{name:'風行戰車',cost:{ore:130,oil:45},time:18,hp:220,range:135,damage:25,rate:.8,speed:115,kind:'vehicle',role:'ranged',pop:3},ranger_ballista:{name:'森林巨弩',cost:{ore:155,oil:60},time:21,hp:180,range:310,damage:82,rate:3.7,speed:24,kind:'artillery',role:'ranged',pop:3},
- nomad_javelin:{name:'沙海投矛手',cost:{wood:55,ore:25},time:10,hp:82,range:125,damage:18,rate:.9,speed:72,kind:'infantry',role:'ranged',pop:1},nomad_skirmisher:{name:'流沙伏擊者',cost:{wood:45,ore:35},time:11,hp:105,range:38,damage:24,rate:.8,speed:92,kind:'infantry',role:'melee',pop:1},nomad_chariot:{name:'雙輪掠襲車',cost:{ore:100,oil:30},time:15,hp:195,range:120,damage:19,rate:.7,speed:132,kind:'vehicle',role:'ranged',pop:2},nomad_lancer:{name:'沙丘重槍騎',cost:{ore:135,oil:45},time:18,hp:265,range:38,damage:42,rate:.9,speed:108,kind:'vehicle',role:'melee',pop:3},nomad_bombard:{name:'沙漠火炮',cost:{ore:145,oil:65},time:21,hp:160,range:345,damage:75,rate:3.5,speed:30,kind:'artillery',role:'ranged',pop:3},
- eng_colossus:{name:'磁軌巨砲機甲',cost:{wood:220,ore:260,oil:200},time:34,hp:460,range:365,damage:110,rate:4.4,speed:20,kind:'artillery',role:'ranged',pop:4},
- iron_dreadnought:{name:'帝國攻城列車',cost:{wood:180,ore:280,oil:200},time:35,hp:650,range:355,damage:135,rate:4.8,speed:18,kind:'artillery',role:'ranged',pop:5},
- ranger_skybreaker:{name:'天穹穿甲巨弩',cost:{wood:200,ore:270,oil:190},time:33,hp:330,range:390,damage:108,rate:4.2,speed:23,kind:'artillery',role:'ranged',pop:4},
- nomad_meteor:{name:'流星攻城炮',cost:{wood:160,ore:250,oil:180},time:31,hp:380,range:355,damage:116,rate:4.1,speed:30,kind:'artillery',role:'ranged',pop:4}
+ eng_repeater:{name:'連弩機械兵',cost:{food:65,wood:35},time:11,hp:88,range:175,damage:15,rate:1,speed:55,kind:'infantry',role:'ranged',pop:1},eng_sapper:{name:'電磁爆破工兵',cost:{food:55,wood:65},time:14,hp:92,range:42,damage:29,rate:1.35,speed:52,kind:'infantry',role:'melee',pop:2},eng_drone:{name:'蜂群偵察機',cost:{wood:75,gold:25},time:13,hp:105,range:150,damage:13,rate:.8,speed:112,kind:'vehicle',role:'ranged',pop:2},eng_walker:{name:'四足機甲',cost:{wood:145,gold:55},time:19,hp:290,range:165,damage:34,rate:1.35,speed:48,kind:'vehicle',role:'ranged',pop:3},eng_siege:{name:'磁軌攻城車',cost:{wood:170,gold:85},time:23,hp:205,range:295,damage:72,rate:3.4,speed:27,kind:'artillery',role:'ranged',pop:3},
+ iron_pikeman:{name:'帝國長戟兵',cost:{food:50,wood:30},time:10,hp:145,range:36,damage:23,rate:1,speed:48,kind:'infantry',role:'melee',pop:1},iron_crossbow:{name:'重弩破甲手',cost:{food:55,wood:55},time:13,hp:92,range:165,damage:23,rate:1.35,speed:43,kind:'infantry',role:'ranged',pop:1},iron_ram:{name:'鋼鐵攻城槌',cost:{food:95,wood:105},time:18,hp:370,range:34,damage:54,rate:1.5,speed:27,kind:'vehicle',role:'melee',pop:4},iron_tank:{name:'帝國重坦',cost:{wood:165,gold:65},time:21,hp:390,range:180,damage:49,rate:1.55,speed:32,kind:'vehicle',role:'ranged',pop:4},iron_mortar:{name:'重型迫擊砲車',cost:{wood:150,gold:70},time:22,hp:185,range:280,damage:78,rate:3.8,speed:25,kind:'artillery',role:'ranged',pop:3},
+ ranger_blade:{name:'林地雙刃客',cost:{food:55,wood:30},time:10,hp:90,range:32,damage:27,rate:.75,speed:82,kind:'infantry',role:'melee',pop:1},ranger_trapper:{name:'荒野陷阱師',cost:{food:70,wood:45},time:13,hp:78,range:155,damage:18,rate:1.1,speed:62,kind:'infantry',role:'ranged',pop:1},ranger_hawk:{name:'獵鷹空騎',cost:{wood:95,gold:40},time:16,hp:145,range:145,damage:19,rate:.9,speed:125,kind:'vehicle',role:'ranged',pop:2},ranger_wind:{name:'風行戰車',cost:{wood:130,gold:45},time:18,hp:220,range:135,damage:25,rate:.8,speed:115,kind:'vehicle',role:'ranged',pop:3},ranger_ballista:{name:'森林巨弩',cost:{wood:155,gold:60},time:21,hp:180,range:310,damage:82,rate:3.7,speed:24,kind:'artillery',role:'ranged',pop:3},
+ nomad_javelin:{name:'沙海投矛手',cost:{food:55,wood:25},time:10,hp:82,range:125,damage:18,rate:.9,speed:72,kind:'infantry',role:'ranged',pop:1},nomad_skirmisher:{name:'流沙伏擊者',cost:{food:45,wood:35},time:11,hp:105,range:38,damage:24,rate:.8,speed:92,kind:'infantry',role:'melee',pop:1},nomad_chariot:{name:'雙輪掠襲車',cost:{wood:100,gold:30},time:15,hp:195,range:120,damage:19,rate:.7,speed:132,kind:'vehicle',role:'ranged',pop:2},nomad_lancer:{name:'沙丘重槍騎',cost:{wood:135,gold:45},time:18,hp:265,range:38,damage:42,rate:.9,speed:108,kind:'vehicle',role:'melee',pop:3},nomad_bombard:{name:'沙漠火炮',cost:{wood:145,gold:65},time:21,hp:160,range:345,damage:75,rate:3.5,speed:30,kind:'artillery',role:'ranged',pop:3},
+ eng_colossus:{name:'磁軌巨砲機甲',cost:{food:220,wood:260,gold:200},time:34,hp:460,range:365,damage:110,rate:4.4,speed:20,kind:'artillery',role:'ranged',pop:4},
+ iron_dreadnought:{name:'帝國攻城列車',cost:{food:180,wood:280,gold:200},time:35,hp:650,range:355,damage:135,rate:4.8,speed:18,kind:'artillery',role:'ranged',pop:5},
+ ranger_skybreaker:{name:'天穹穿甲巨弩',cost:{food:200,wood:270,gold:190},time:33,hp:330,range:390,damage:108,rate:4.2,speed:23,kind:'artillery',role:'ranged',pop:4},
+ nomad_meteor:{name:'流星攻城炮',cost:{food:160,wood:250,gold:180},time:31,hp:380,range:355,damage:116,rate:4.1,speed:30,kind:'artillery',role:'ranged',pop:4},eng_tesla_guard:{name:'雷霆線圈衛士',desc:'電弧中程重甲步兵，能壓制敵方近戰群',cost:{food:110,wood:95,gold:20},time:20,hp:255,range:95,damage:38,rate:1.3,speed:43,kind:'infantry',role:'ranged',pop:2},iron_hammerguard:{name:'帝國震鎚衛隊',desc:'重裝近衛，擅長近距離破壞建築',cost:{food:125,wood:105,gold:25},time:21,hp:360,range:34,damage:48,rate:1.25,speed:34,kind:'infantry',role:'melee',pop:3},ranger_phantom:{name:'幽影狙擊手',desc:'極遠射程伏擊單位，生命較低但單發傷害高',cost:{food:100,wood:120,gold:25},time:22,hp:92,range:300,damage:48,rate:2.2,speed:52,kind:'infantry',role:'ranged',pop:2},nomad_dune_wolf:{name:'沙丘狼騎',desc:'高速突襲騎兵，擅長追擊遠程部隊',cost:{food:115,wood:95,gold:20},time:19,hp:225,range:38,damage:37,rate:.75,speed:142,kind:'vehicle',role:'melee',pop:2},eng_singularity_tank:{name:'奇點重裝平台',desc:'高耐久重型能量戰車，兼具遠程火力',cost:{food:230,wood:260,gold:180},time:34,hp:610,range:230,damage:78,rate:2.2,speed:34,kind:'vehicle',role:'ranged',pop:4},iron_siege_mech:{name:'帝國泰坦攻城機',desc:'極高耐久重型攻城機甲，專門突破防線',cost:{food:250,wood:280,gold:200},time:37,hp:820,range:90,damage:115,rate:2.6,speed:25,kind:'vehicle',role:'melee',pop:5},ranger_stormhawk:{name:'風暴鷹空騎',desc:'高速空中打擊平台，兼具射程與機動性',cost:{food:190,wood:245,gold:175},time:32,hp:390,range:235,damage:62,rate:1.8,speed:150,kind:'vehicle',role:'ranged',pop:4},nomad_sunlance:{name:'日蝕穿刺戰車',desc:'高速重型突擊車，能快速切入敵方後排',cost:{food:200,wood:230,gold:165},time:30,hp:455,range:65,damage:92,rate:1.6,speed:112,kind:'vehicle',role:'melee',pop:4}
 });
-var factionRosters={engineers:{barracks:['warden','eng_repeater','eng_sapper'],factory:['eng_drone','eng_walker','eng_siege','eng_colossus']},ironclad:{barracks:['breaker','iron_pikeman','iron_crossbow'],factory:['iron_ram','iron_tank','iron_mortar','iron_dreadnought']},rangers:{barracks:['marksman','ranger_blade','ranger_trapper'],factory:['ranger_hawk','ranger_wind','ranger_ballista','ranger_skybreaker']},nomads:{barracks:['raider','nomad_javelin','nomad_skirmisher'],factory:['nomad_chariot','nomad_lancer','nomad_bombard','nomad_meteor']}};
-var factionUnitEra={eng_repeater:0,eng_sapper:1,eng_drone:1,eng_walker:2,eng_siege:2,iron_pikeman:0,iron_crossbow:1,iron_ram:1,iron_tank:2,iron_mortar:2,ranger_blade:0,ranger_trapper:1,ranger_hawk:1,ranger_wind:2,ranger_ballista:2,nomad_javelin:0,nomad_skirmisher:1,nomad_chariot:1,nomad_lancer:2,nomad_bombard:2,eng_colossus:3,iron_dreadnought:3,ranger_skybreaker:3,nomad_meteor:3};
+var factionRosters={engineers:{barracks:['warden','eng_repeater','eng_sapper','eng_tesla_guard'],factory:['eng_drone','eng_walker','eng_siege','eng_colossus','eng_singularity_tank']},ironclad:{barracks:['breaker','iron_pikeman','iron_crossbow','iron_hammerguard'],factory:['iron_ram','iron_tank','iron_mortar','iron_dreadnought','iron_siege_mech']},rangers:{barracks:['marksman','ranger_blade','ranger_trapper','ranger_phantom'],factory:['ranger_hawk','ranger_wind','ranger_ballista','ranger_skybreaker','ranger_stormhawk']},nomads:{barracks:['raider','nomad_javelin','nomad_skirmisher','nomad_dune_wolf'],factory:['nomad_chariot','nomad_lancer','nomad_bombard','nomad_meteor','nomad_sunlance']}};
+var factionBuildingRace={eng_repair_bastion:'engineers',eng_orbital_array:'engineers',iron_war_foundry:'ironclad',iron_dread_fortress:'ironclad',ranger_living_grove:'rangers',ranger_sky_obelisk:'rangers',nomad_caravanserai:'nomads',nomad_sun_spire:'nomads'};
+var factionBuildingEra={eng_repair_bastion:2,iron_war_foundry:2,ranger_living_grove:2,nomad_caravanserai:2,eng_orbital_array:3,iron_dread_fortress:3,ranger_sky_obelisk:3,nomad_sun_spire:3};
+var factionBuildingRosters={engineers:{era3:'eng_repair_bastion',era4:'eng_orbital_array'},ironclad:{era3:'iron_war_foundry',era4:'iron_dread_fortress'},rangers:{era3:'ranger_living_grove',era4:'ranger_sky_obelisk'},nomads:{era3:'nomad_caravanserai',era4:'nomad_sun_spire'}};
+var factionUnitEra={eng_repeater:0,eng_sapper:1,eng_drone:1,eng_walker:2,eng_siege:2,iron_pikeman:0,iron_crossbow:1,iron_ram:1,iron_tank:2,iron_mortar:2,ranger_blade:0,ranger_trapper:1,ranger_hawk:1,ranger_wind:2,ranger_ballista:2,nomad_javelin:0,nomad_skirmisher:1,nomad_chariot:1,nomad_lancer:2,nomad_bombard:2,eng_colossus:3,iron_dreadnought:3,ranger_skybreaker:3,nomad_meteor:3,eng_tesla_guard:2,iron_hammerguard:2,ranger_phantom:2,nomad_dune_wolf:2,eng_singularity_tank:3,iron_siege_mech:3,ranger_stormhawk:3,nomad_sunlance:3};
 
 var buildingDefs={
-hq:{name:'主堡',cost:{wood:250,ore:180,oil:80},hp:1300,w:90,h:78,kind:'hq'},
-barracks:{name:'兵營',cost:{wood:130,ore:50},hp:550,w:72,h:62,kind:'barracks'},
-factory:{name:'戰車工廠',cost:{wood:150,ore:180},hp:700,w:88,h:68,kind:'factory'},
-lumber:{name:'伐木場',cost:{wood:90},hp:320,w:58,h:52,kind:'lumber'},
-mine:{name:'採礦站',cost:{wood:100,ore:35},hp:360,w:58,h:52,kind:'mine'},
-power:{name:'發電廠',cost:{wood:90,ore:35},hp:300,w:56,h:50,kind:'power'},
-turret:{name:'機槍塔',cost:{wood:80,ore:100},hp:430,w:48,h:48,kind:'turret'},
-fort:{name:'前線堡壘',cost:{wood:160,ore:180},hp:850,w:76,h:68,kind:'fort'},
-lab:{name:'科技研究所',cost:{wood:180,ore:140},hp:520,w:70,h:60,kind:'lab'},
-bunker:{name:'重型碉堡',cost:{wood:120,ore:140},hp:680,w:60,h:56,kind:'bunker'},
-cannon:{name:'重砲塔',cost:{wood:200,ore:280,oil:140},hp:900,w:76,h:72,kind:'cannon'},
-missile:{name:'飛彈發射井',cost:{wood:120,ore:160,oil:120},hp:780,w:68,h:64,kind:'missile'},
-depot:{name:'補給中心',cost:{wood:150,ore:90},hp:480,w:64,h:56,kind:'depot'},house:{name:'房屋',cost:{wood:100,ore:35},hp:420,w:62,h:54,kind:'house'},wall:{name:'城牆',cost:{wood:50,ore:20},hp:800,w:82,h:30,kind:'wall'},
-wonder:{name:'世界奇觀',cost:{wood:900,ore:700,oil:350},hp:2400,w:112,h:104,kind:'wonder'}
+hq:{name:'主堡',cost:{food:250,wood:180,gold:80},hp:1300,w:90,h:78,kind:'hq'},
+barracks:{name:'兵營',cost:{food:130,wood:50},hp:550,w:72,h:62,kind:'barracks'},
+factory:{name:'戰車工廠',cost:{food:150,wood:180},hp:700,w:88,h:68,kind:'factory'},
+meatFarm:{name:'獵場',cost:{food:90},hp:320,w:58,h:52,kind:'meatFarm'},
+woodshop:{name:'木材加工所',cost:{food:100,wood:35},hp:360,w:58,h:52,kind:'woodshop'},
+goldmine:{name:'金礦場',cost:{food:90,wood:35},hp:300,w:56,h:50,kind:'goldmine'},
+turret:{name:'機槍塔',cost:{food:80,wood:100},hp:430,w:48,h:48,kind:'turret'},
+fort:{name:'前線堡壘',cost:{food:160,wood:180},hp:850,w:76,h:68,kind:'fort'},
+lab:{name:'科技研究所',cost:{food:180,wood:140},hp:520,w:70,h:60,kind:'lab'},
+bunker:{name:'重型碉堡',cost:{food:120,wood:140},hp:680,w:60,h:56,kind:'bunker'},
+cannon:{name:'重砲塔',cost:{food:200,wood:280,gold:140},hp:900,w:76,h:72,kind:'cannon'},
+missile:{name:'飛彈發射井',cost:{food:120,wood:160,gold:120},hp:780,w:68,h:64,kind:'missile'},
+depot:{name:'補給中心',cost:{food:150,wood:90},hp:480,w:64,h:56,kind:'depot'},house:{name:'房屋',cost:{food:100,wood:35},hp:420,w:62,h:54,kind:'house'},wall:{name:'城牆',cost:{food:50,wood:20},hp:800,w:82,h:30,kind:'wall'},
+wonder:{name:'世界奇觀',cost:{food:900,wood:700,gold:350},hp:2400,w:112,h:104,kind:'wonder'},eng_repair_bastion:{name:'自律維修堡壘',cost:{food:230,wood:210,gold:80},hp:950,w:78,h:70,kind:'unique',auraHealBuildings:2.8},eng_orbital_array:{name:'軌道火力陣列',cost:{food:330,wood:350,gold:260},hp:1250,w:90,h:82,kind:'unique',defenseRange:390,defenseDamage:96,defenseRate:3.6},iron_war_foundry:{name:'帝國戰爭鑄造廠',cost:{food:240,wood:230,gold:90},hp:1100,w:82,h:74,kind:'unique',defenseRange:250,defenseDamage:38,defenseRate:1.5},iron_dread_fortress:{name:'鋼鐵末日要塞',cost:{food:350,wood:370,gold:270},hp:1750,w:96,h:88,kind:'unique',defenseRange:345,defenseDamage:86,defenseRate:3.2},ranger_living_grove:{name:'遠古生命樹庭',cost:{food:220,wood:240,gold:75},hp:850,w:82,h:76,kind:'unique',auraHealUnits:3.8},ranger_sky_obelisk:{name:'天穹觀測方尖碑',cost:{food:320,wood:330,gold:240},hp:1050,w:78,h:100,kind:'unique',defenseRange:420,defenseDamage:78,defenseRate:3.1},nomad_caravanserai:{name:'黃金商旅驛站',cost:{food:210,wood:220,gold:60},hp:900,w:84,h:72,kind:'unique',passiveIncome:{gold:1.1}},nomad_sun_spire:{name:'烈日神殿尖塔',cost:{food:310,wood:300,gold:230},hp:1150,w:80,h:104,kind:'unique',defenseRange:330,defenseDamage:105,defenseRate:3.9}
 };
 function log(s){var d=document.createElement('div');d.className='logline';d.textContent='['+fmt(elapsed)+'] '+s;ui.log.prepend(d);while(ui.log.children.length>30)ui.log.lastChild.remove()}
 function fmt(t){return Math.floor(t/60)+':'+('0'+Math.floor(t%60)).slice(-2)}
-function costText(c){return Object.keys(c).map(k=>({wood:'木',ore:'礦',oil:'油'}[k])+c[k]).join(' ')}
+function costText(c){return Object.keys(c).map(k=>({food:'肉',wood:'木',gold:'金'}[k])+c[k]).join(' ')}
 function eraName(team){return eraNames[eras[team]||0]}
 function buildingName(type,team){
  var e=eras[team]||0;
@@ -153,9 +156,9 @@ function buildingName(type,team){
  hq:['部落議事廳','領主城堡','帝國皇宮','星際指揮核心'],
  barracks:['戰士營地','兵營','皇家軍校','機甲兵工署'],
  factory:['攻城工坊','軍械工廠','裝甲車輛工廠','全域載具組裝廠'],
- lumber:['伐木營地','木材加工所','皇家林務署','生質材料中心'],
- mine:['露天採石場','採礦場','帝國礦務局','深層資源精煉站'],
- power:['人力發電站','蒸汽動力廠','燃油發電廠','聚變能源核心'],
+ meatFarm:['伐木營地','肉加工所','皇家林務署','生質材料中心'],
+ woodshop:['伐木營地','木材加工所','皇家林務署','生質材料中心'],
+ goldmine:['淺層淘金場','金礦場','帝國金礦總署','深層金礦精煉核心'],
  turret:['箭塔','弩砲塔','機槍塔','脈衝防禦塔'],
  fort:['木柵前哨','石造堡壘','前線要塞','重裝防衛基地'],
  lab:['工匠研究所','學院','科技研究院','量子研究中心'],
@@ -171,16 +174,16 @@ function buildingName(type,team){
 }
 function unitName(type,team){var race=raceDefs[teamRaces[team]||'engineers'];if(race&&race.unique===type)return race.unitName;var names={worker:['石器採集者','封建工匠','帝國工程師','科技工程師'],melee:['石斧突擊兵','盾矛衛士','帝國劍士','近戰突擊機兵'],rifle:['石矛戰士','長弓兵','火槍兵','電磁步兵'],rocket:['投石兵','弩砲手','火箭兵','等離子反裝甲兵'],scout:['馴狼斥候','輕騎斥候','裝甲偵察車','無人偵察機'],medic:['草藥療癒師','戰地醫護兵','野戰醫療官','醫療機器人'],tank:['攻城車','重型攻城車','主力戰車','懸浮重戰車'],artillery:['投石器','重型弩砲','自走火砲','軌道火砲'],heavy:['巨型攻城機','重裝戰車','超重型戰車','泰坦機甲']};return (names[type]||[])[eras[team]||0]||defs[type].name}
 function canBuildAt(type,x,y){var d=buildingDefs[type];if(x-d.w/2<0||x+d.w/2>W||y-d.h/2<0||y+d.h/2>H)return false;return !buildings.some(b=>{if(type==='wall'&&b.type==='wall')return false;var q=buildingDefs[b.type];return Math.abs(b.x-x)<(q.w+d.w)/2+8&&Math.abs(b.y-y)<(q.h+d.h)/2+8})}
-function minEraForBuilding(type){return ({factory:1,lab:1,bunker:2,depot:2,cannon:2,missile:2,fort:1,turret:1,wonder:0})[type]||0}
+function minEraForBuilding(type){return factionBuildingEra[type]!==undefined?factionBuildingEra[type]:(({factory:1,lab:1,bunker:2,depot:2,cannon:2,missile:2,fort:1,turret:1,wonder:0})[type]||0)}
 function minEraForUnit(type){return factionUnitEra[type]!==undefined?factionUnitEra[type]:((({rocket:1,scout:1,medic:1,tank:2,artillery:2,heavy:3})[type])||0)}
-function eraCost(next){return [{wood:150,ore:100},{wood:300,ore:250,oil:100},{wood:450,ore:400,oil:250}][next-1]}
-function wonderUpgradeCost(level){return [null,{wood:900,ore:700,oil:350},{wood:1500,ore:1200,oil:700},{wood:2500,ore:2000,oil:1400}][level]}
+function eraCost(next){return [{food:150,wood:100},{food:300,wood:250,gold:100},{food:450,wood:400,gold:250}][next-1]}
+function wonderUpgradeCost(level){return [null,{food:900,wood:700,gold:350},{food:1500,wood:1200,gold:700},{food:2500,wood:2000,gold:1400}][level]}
 function canWonderUpgrade(team,level){var own=buildings.filter(b=>b.team===team);if(level===1)return own.some(b=>b.type==='barracks');if(level===2)return eras[team]>=1&&own.some(b=>b.type==='factory')&&own.some(b=>b.type==='lab');if(level===3)return eras[team]>=2&&own.some(b=>b.type==='lab')&&own.some(b=>b.type==='depot');return false}
-function militaryProgramCost(level){return [null,{wood:650,ore:550,oil:300},{wood:950,ore:850,oil:500},{wood:1400,ore:1250,oil:800}][level]}
+function militaryProgramCost(level){return [null,{food:650,wood:550,gold:300},{food:950,wood:850,gold:500},{food:1400,wood:1250,gold:800}][level]}
 function upgradeMilitaryProgram(team){var next=(teamPrograms[team]||0)+1;if(next>3)return false;var wallet=countryResources[team]||resources,c=militaryProgramCost(next);if(!Object.keys(c).every(k=>(wallet[k]||0)>=c[k]))return false;Object.keys(c).forEach(k=>wallet[k]-=c[k]);teamPrograms[team]=next;units.filter(u=>u.team===team&&u.hp>0).forEach(u=>{u.max*=1.08;u.hp*=1.08;u.attackDamage*=1.06});if(team==='p')log('軍備計畫升至 '+next+'/3：現有與新生部隊生命 +8%、攻擊 +6%。');return true}
 function grantWonderBuff(team,type){wonderBuffs[team][type]++;wonderChosen[team]++;if(team==='p')log(type==='military'?'世界奇觀加成：全兵種攻擊力永久 +15%。':'世界奇觀加成：所有資源採集效率永久 +25%。')}
 function canAdvance(team,next){var own=buildings.filter(b=>b.team===team);if(wonderLevels[team]<next||wonderChosen[team]<next)return false;if(next===1)return own.some(b=>b.type==='barracks');if(next===2)return own.some(b=>b.type==='factory')&&own.some(b=>b.type==='lab');return own.some(b=>b.type==='lab')&&own.some(b=>b.type==='depot')}
-function advanceEra(team){var next=eras[team]+1,c=eraCost(next),wallet=countryResources[team]||resources;if(next>3||!canAdvance(team,next)||!Object.keys(c).every(k=>(wallet[k]||0)>=c[k]))return false;Object.keys(c).forEach(k=>wallet[k]-=c[k]);eras[team]=next;if(team==='p')log('文明躍進！進入'+eraNames[next]+'，兵種名稱與可用科技已更新。');return true}
+function advanceEra(team){var next=eras[team]+1,c=eraCost(next),wallet=countryResources[team]||resources;if(next>3||!c||!canAdvance(team,next)||!Object.keys(c).every(k=>(wallet[k]||0)>=c[k]))return false;Object.keys(c).forEach(k=>wallet[k]-=c[k]);eras[team]=next;if(team==='p')log('文明躍進！進入'+eraNames[next]+'，兵種名稱與可用科技已更新。');return true}
 function canPay(c){return Object.keys(c).every(k=>resources[k]>=c[k])}
 function pay(c){if(!canPay(c))return false;Object.keys(c).forEach(k=>resources[k]-=c[k]);return true}
 function makeUnit(team,type,x,y){var d=defs[type],race=raceDefs[teamRaces[team]||'engineers'],special=race.unique===type?race.uniqueStats||{}:{},role=d.role||'ranged',hp=(d.hp||50)*(race.hp||1)*(role==='melee'?(race.meleeHp||1):1)*(special.hp||1),u={id:nextId++,team:team,kind:'unit',type:type,x:x,y:y,hp:hp,max:hp,combat:{role:role},order:null,target:null,carry:0,resource:null,cool:Math.random(),buildQueue:[],moving:false};var unitLv=unitLevel(team,type);u.attackDamage=d.damage*(special.damage||1)*(role==='melee'?(race.meleeDamage||1):(race.rangedDamage||1))*Math.pow(1.06,teamPrograms[team]||0)*Math.pow(1.07,unitLv-1);u.max*=Math.pow(1.08,teamPrograms[team]||0)*Math.pow(1.08,unitLv-1);u.hp=u.max;u.attackRange=d.range*(special.range||1)*(role==='ranged'?(race.rangedRange||1):1);u.attackRate=d.rate*(special.rate||1);u.moveSpeed=d.speed*(race.speed||1)*(special.speed||1);units.push(u);return u}
@@ -188,11 +191,11 @@ function makeBuilding(team,type,x,y){var d=buildingDefs[type],hp=d.hp*(raceDefs[
 function node(type,x,y,amount){var zone=x<W/2?(y<H/2?'p':'n'):(y<H/2?'e':'s');if(Math.abs(x-W/2)<190*MAP_SCALE)zone='center';nodes.push({type:type,x:x,y:y,amount:amount,max:amount,zone:zone})}
 function init(){
 fogSeen.fill(0);fogNow.fill(0);fogTimer=0;
-teamPrograms={p:0,e:0,n:0,s:0};teamUnitLevels={p:{},e:{},n:{},s:{}};resources={wood:600,ore:450,oil:250};enemyResources={wood:600,ore:450,oil:250};countryResources={p:resources,e:{wood:600,ore:450,oil:250},n:{wood:600,ore:450,oil:250},s:{wood:600,ore:450,oil:250}};
-rallyPoints={p:null,e:null,n:null,s:null};techs=emptyTechs();eras={p:0,e:0,n:0,s:0};wonderLevels={p:0,e:0,n:0,s:0};wonderChosen={p:0,e:0,n:0,s:0};wonderBuffs={p:{military:0,economy:0},e:{military:0,economy:0},n:{military:0,economy:0},s:{military:0,economy:0}};aiWaveTimers={e:0,n:0,s:0};aiWaveCounts={e:1,n:1,s:1};aiMind={e:{raid:0,posture:'balanced'},n:{raid:0,posture:'balanced'},s:{raid:0,posture:'balanced'}};aiIntel={coalition:false,leader:null,power:{}};units=[];buildings=[];nodes=[];bullets=[];effects=[];nextId=1;elapsed=0;aiTimer=0;spawnTimer=0;enemyWaveTimer=0;enemyWaveCount=1;gameOver=false;selected=[];placing=null;popCap=30;
+teamPrograms={p:0,e:0,n:0,s:0};teamUnitLevels={p:{},e:{},n:{},s:{}};resources={food:600,wood:450,gold:250};enemyResources={food:600,wood:450,gold:250};countryResources={p:resources,e:{food:600,wood:450,gold:250},n:{food:600,wood:450,gold:250},s:{food:600,wood:450,gold:250}};
+rallyPoints={p:null,e:null,n:null,s:null};techs=emptyTechs();eras={p:0,e:0,n:0,s:0};wonderLevels={p:0,e:0,n:0,s:0};wonderChosen={p:0,e:0,n:0,s:0};wonderBuffs={p:{military:0,economy:0},e:{military:0,economy:0},n:{military:0,economy:0},s:{military:0,economy:0}};aiWaveTimers={e:0,n:0,s:0};aiWaveCounts={e:1,n:1,s:1};aiMind={e:{raid:0,posture:'balanced'},n:{raid:0,posture:'balanced'},s:{raid:0,posture:'balanced'}};aiIntel={coalition:false,leader:null,goldmine:{}};units=[];buildings=[];nodes=[];bullets=[];effects=[];nextId=1;elapsed=0;aiTimer=0;spawnTimer=0;enemyWaveTimer=0;enemyWaveCount=1;gameOver=false;selected=[];placing=null;popCap=30;
 var bases={p:{x:180*MAP_SCALE,y:180*MAP_SCALE,dx:1,dy:1},e:{x:1320*MAP_SCALE,y:180*MAP_SCALE,dx:-1,dy:1},n:{x:180*MAP_SCALE,y:820*MAP_SCALE,dx:1,dy:-1},s:{x:1320*MAP_SCALE,y:820*MAP_SCALE,dx:-1,dy:-1}};
 Object.keys(bases).forEach(team=>{var q=bases[team];makeBuilding(team,'hq',q.x,q.y);makeBuilding(team,'barracks',q.x+q.dx*112*MAP_SCALE,q.y+q.dy*65*MAP_SCALE);if(team!=='p')makeBuilding(team,'fort',q.x+q.dx*205*MAP_SCALE,q.y+q.dy*5*MAP_SCALE);for(var i=0;i<4;i++)makeUnit(team,'worker',q.x+q.dx*(70+i*17)*MAP_SCALE,q.y+q.dy*(95+(i%2)*18)*MAP_SCALE);for(var j=0;j<(team==='p'?1:3);j++)makeUnit(team,'rifle',q.x+q.dx*(155+j*18)*MAP_SCALE,q.y+q.dy*(45+(j%2)*18)*MAP_SCALE);});
-var patches=[['wood',[[360,90],[90,360],[1140,90],[1410,360],[360,910],[90,640],[1140,910],[1410,640],[700,300],[800,700]],3,2,34,38,6500],['ore',[[430,280],[280,430],[1070,280],[1220,430],[430,720],[280,570],[1070,720],[1220,570],[680,450],[820,550]],2,2,38,42,7200],['oil',[[520,90],[90,520],[980,90],[1410,520],[520,910],[90,480],[980,910],[1410,480],[750,180],[750,820]],2,1,42,0,5600]];
+var patches=[['food',[[360,90],[90,360],[1140,90],[1410,360],[360,910],[90,640],[1140,910],[1410,640],[700,300],[800,700]],3,2,34,38,6500],['wood',[[430,280],[280,430],[1070,280],[1220,430],[430,720],[280,570],[1070,720],[1220,570],[680,450],[820,550]],2,2,38,42,7200],['gold',[[520,90],[90,520],[980,90],[1410,520],[520,910],[90,480],[980,910],[1410,480],[750,180],[750,820]],2,1,42,0,5600]];
 patches.forEach(v=>v[1].forEach(p=>{for(var a=0;a<v[2];a++)for(var b=0;b<v[3];b++)node(v[0],(p[0]+a*v[4])*MAP_SCALE,(p[1]+b*v[5])*MAP_SCALE,v[6])}));
 updateUI();log('四國混戰開始：四個國家彼此敵對，爭奪中央資源與世界奇觀。');
 }
@@ -200,11 +203,11 @@ function countPop(team){return units.filter(u=>u.team===team).reduce((a,u)=>a+de
 function teamPopCap(team){return 30+buildings.filter(b=>b.team===team&&b.type==='hq').length*10+buildings.filter(b=>b.team===team&&b.type==='fort').length*5+buildings.filter(b=>b.team===team&&b.type==='house').length*20}
 function myCap(){return teamPopCap('p')}
 function updateUI(){
-selected=selected.filter(o=>o&&Number(o.hp)>0);ui.wood.textContent=Math.floor(resources.wood);ui.ore.textContent=Math.floor(resources.ore);ui.oil.textContent=Math.floor(resources.oil);ui.pop.textContent=countPop('p')+'/'+myCap();ui.era.textContent=eraName('p');
+selected=selected.filter(o=>o&&Number(o.hp)>0);ui.food.textContent=Math.floor(resources.food);ui.wood.textContent=Math.floor(resources.wood);ui.gold.textContent=Math.floor(resources.gold);ui.pop.textContent=countPop('p')+'/'+myCap();ui.era.textContent=eraName('p');
 try{renderActions();renderSelection()}catch(err){console.error('UI render error',err);ui.selection.textContent='介面更新錯誤：'+(err&&err.message?err.message:'未知錯誤');ui.actions.replaceChildren()}
 }
-var buildHotkeys={house:'H',wall:'T',barracks:'1',factory:'2',lumber:'3',mine:'4',power:'5',turret:'6',fort:'7',lab:'8',bunker:'9',depot:'0',cannon:'Q',missile:'W',wonder:'E'};
-function startBuild(k){var d=buildingDefs[k];if(!d||!selected.some(o=>o.team==='p'&&o.kind==='unit'&&o.type==='worker'))return;if(k==='hq'&&buildings.some(v=>v.team==='p'&&v.type==='hq')){log('主堡尚未被摧毀，無須重建。');return}if(eras.p<minEraForBuilding(k)||!canPay(d.cost)){log('無法建造：時代或資源不足。');return}placing=k;wallStart=null;log(k==='wall'?'城牆模式：右鍵設定起點，再右鍵設定終點；Esc取消。':'選擇建造'+buildingName(k,'p')+'：按右鍵放置，Esc 取消。');renderActions()}
+var buildHotkeys={house:'H',wall:'T',barracks:'1',factory:'2',meatFarm:'3',woodshop:'4',goldmine:'5',turret:'6',fort:'7',lab:'8',bunker:'9',depot:'0',cannon:'Q',missile:'W',wonder:'E'};
+function startBuild(k){var d=buildingDefs[k];if(!d||!selected.some(o=>o.team==='p'&&o.kind==='unit'&&o.type==='worker'))return;if(factionBuildingRace[k]&&factionBuildingRace[k]!==teamRaces.p){log('此建築僅限特定文明建造。');return}if(k==='hq'&&buildings.some(v=>v.team==='p'&&v.type==='hq')){log('主堡尚未被摧毀，無須重建。');return}if(eras.p<minEraForBuilding(k)||!canPay(d.cost)){log('無法建造：時代或資源不足。');return}placing=k;wallStart=null;log(k==='wall'?'城牆模式：右鍵設定起點，再右鍵設定終點；Esc取消。':'選擇建造'+buildingName(k,'p')+'：按右鍵放置，Esc 取消。');renderActions()}
 function renderProductionQueue(b){var wrap=document.createElement('div');wrap.className='hint';wrap.style.cssText='grid-column:1/-1;white-space:normal;line-height:1.65';var title=document.createElement('b');title.textContent='生產佇列：'+(b.queue.length?b.queue.length+' 項':'空');wrap.appendChild(title);if(b.repeatType){var rp=document.createElement('div');rp.textContent='持續生產：'+unitName(b.repeatType,'p')+'（資源或人口不足時等待）';wrap.appendChild(rp)}b.queue.forEach((q,i)=>{var line=document.createElement('div');line.style.cssText='display:flex;align-items:center;gap:5px;justify-content:space-between';var label=document.createElement('span');label.textContent=(i===0?'▶ ':'')+unitName(q.type,'p')+(i===0?' · '+Math.ceil(q.remain)+'秒':' · 等待中');line.appendChild(label);if(i>0){var cancel=document.createElement('button');cancel.textContent='取消';cancel.style.padding='3px 6px';cancel.onclick=()=>cancelQueuedUnit(b,i);line.appendChild(cancel)}wrap.appendChild(line)});if(b.queue.length>1){var clear=document.createElement('button');clear.textContent='取消後續排程（全額退款）';clear.style.marginTop='5px';clear.onclick=()=>{for(var i=b.queue.length-1;i>=1;i--)cancelQueuedUnit(b,i)};wrap.appendChild(clear)}ui.actions.appendChild(wrap)}
 function renderUnitUpgradeControl(b,type,btn){var lv=unitLevel('p',type),job=buildings.find(x=>x.team==='p'&&x.unitUpgrade&&x.unitUpgrade.type===type),cost=lv<5?unitUpgradeCost(lv+1):null;if(lv>=5){btn('↳ '+unitName(type,'p')+' 熟練度 MAX 5/5',function(){},true);return}if(job){btn('↳ '+unitName(type,'p')+' 升級中 '+job.unitUpgrade.level+'/5（'+Math.ceil(job.unitUpgrade.remain)+'秒）',function(){},true);return}btn('↳ '+unitName(type,'p')+' 升級 '+lv+'/5 → '+(lv+1)+'/5（'+costText(cost)+'）',function(){if(!startUnitUpgrade('p',b,type))log('升級失敗：資源不足或此兵種已有升級排程。');updateUI()},!!b.unitUpgrade||!canPay(cost))}
 function renderActions(){
@@ -215,7 +218,7 @@ if(placing){btn(placing==='wall'?(wallStart?'取消城牆終點':'取消城牆�
 if(b&&b.team==='p'&&b.kind==='unit'&&b.type==='worker'){
 var keyHint=document.createElement('div');keyHint.className='hint';keyHint.textContent='建築快捷鍵：1–0、Q/W/E、T 城牆；Esc 取消建造';ui.actions.appendChild(keyHint);
 if(!buildings.some(v=>v.team==='p'&&v.type==='hq'))btn('重建主堡 [R]\n'+costText(buildingDefs.hq.cost),function(){startBuild('hq')},!canPay(buildingDefs.hq.cost));
-Object.keys(buildingDefs).filter(k=>k!=='hq'&&eras.p>=minEraForBuilding(k)&&(k!=='wonder'||!buildings.some(v=>v.team==='p'&&v.type==='wonder'))).forEach(k=>{var d=buildingDefs[k];btn(buildingName(k,'p')+' ['+(buildHotkeys[k]||'')+']\n'+costText(d.cost),function(){startBuild(k)},!canPay(d.cost))});
+Object.keys(buildingDefs).filter(k=>k!=='hq'&&(!factionBuildingRace[k]||factionBuildingRace[k]===teamRaces.p)&&eras.p>=minEraForBuilding(k)&&(k!=='wonder'||!buildings.some(v=>v.team==='p'&&v.type==='wonder'))).forEach(k=>{var d=buildingDefs[k];btn(buildingName(k,'p')+' ['+(buildHotkeys[k]||'')+']\n'+costText(d.cost),function(){startBuild(k)},!canPay(d.cost))});
 }else if(b&&b.team==='p'&&b.kind==='building'){
 if(['hq','barracks','factory'].includes(b.type)){
 renderProductionQueue(b);
@@ -254,7 +257,7 @@ if(b.type==='lab'){
   var programLevel=teamPrograms.p||0;
   if(programLevel<3){var pc=militaryProgramCost(programLevel+1);btn('國家軍備計畫 '+(programLevel+1)+'/3（'+costText(pc)+'）',function(){if(upgradeMilitaryProgram('p'))updateUI();else log('軍備計畫資源不足。')},!canPay(pc));var pd=document.createElement('div');pd.className='muted';pd.style.fontSize='11px';pd.textContent='每級讓現有與新生部隊生命 +8%、攻擊 +6%；最高三級。';ui.actions.appendChild(pd)}else{var done=document.createElement('div');done.className='muted';done.textContent='國家軍備計畫已完成（3/3）。';ui.actions.appendChild(done)}
 }
-btn('修復建築 50木',function(){if(pay({wood:50})){b.hp=Math.min(b.max,b.hp+180);log('建築已修復')}updateUI()},resources.wood<50||b.hp>=b.max);
+btn('修復建築 50肉',function(){if(pay({food:50})){b.hp=Math.min(b.max,b.hp+180);log('建築已修復')}updateUI()},resources.food<50||b.hp>=b.max);
 }
 if(!ui.actions.children.length){btn('選取平民以建造',function(){},true);btn('選取兵營／工廠以生產',function(){},true)}
 }
@@ -265,10 +268,10 @@ var o=selected[0];if(!o||typeof o!=='object'){selected=[];ui.selection.textConte
 var isUnit=o.kind==='unit'||!!defs[o.type],def=isUnit?defs[o.type]:buildingDefs[o.type];
 if(!def){ui.selection.textContent='選取目標資料異常，請重新選取。';return}
 var hp=Math.max(0,Math.ceil(Number(o.hp)||0))+'/'+(Number(o.max)||def.hp);
-var title=document.createElement('b');title.textContent=isUnit?unitName(o.type,o.team):buildingName(o.type,o.team);var detail=document.createElement('div');detail.className='muted';var info='耐久 '+hp;if(isUnit){var role=(def.role||'ranged')==='melee'?'近戰':'遠程';info+='｜'+role+'｜攻擊 '+Math.round(o.attackDamage||def.damage)+'｜攻速 '+(1/(o.attackRate||def.rate)).toFixed(2)+'/秒｜射程 '+Math.round(o.attackRange||def.range)+'｜移速 '+Math.round(o.moveSpeed||def.speed);var raceInfo=raceDefs[teamRaces[o.team]||'engineers'];if(raceInfo&&raceInfo.unique===o.type)info+='｜種族專屬：'+raceInfo.unitDesc;}if(!isUnit){var notes={wall:'城牆：阻擋敵方地面部隊；己方部隊可以自由通過',cannon:'重砲塔：330 射程，105 傷害，適合遠距離重創敵方戰車與建築',missile:'飛彈發射井：285 射程，52 傷害，快速攔截敵方部隊',wonder:'文明躍進核心：每階段選擇軍事或經濟永久加成；升級奇觀才能進入下一時代',lab:'開啟所屬文明的專屬科技樹',bunker:'自動攻擊 175 範圍內敵軍',depot:'附近友軍緩慢恢復生命',lumber:'附近木材採集效率 +50%，可交付木材',mine:'附近礦石採集效率 +50%，可交付礦石',power:'附近油田採集效率 +50%，可交付石油',fort:'周圍友軍每秒恢復 7 HP；可設為部隊集結點',turret:'自動攻擊 210 範圍內的敵軍'};info+='　'+(notes[o.type]||'基地設施');if(Array.isArray(o.queue)&&o.queue.length)info+='　生產中 '+o.queue.length;}detail.textContent=info;ui.selection.replaceChildren(title,detail);
+var title=document.createElement('b');title.textContent=isUnit?unitName(o.type,o.team):buildingName(o.type,o.team);var detail=document.createElement('div');detail.className='muted';var info='耐久 '+hp;if(isUnit){var role=(def.role||'ranged')==='melee'?'近戰':'遠程';if(def.desc)info+='｜'+def.desc;info+='｜'+role+'｜攻擊 '+Math.round(o.attackDamage||def.damage)+'｜攻速 '+(1/(o.attackRate||def.rate)).toFixed(2)+'/秒｜射程 '+Math.round(o.attackRange||def.range)+'｜移速 '+Math.round(o.moveSpeed||def.speed);var raceInfo=raceDefs[teamRaces[o.team]||'engineers'];if(raceInfo&&raceInfo.unique===o.type)info+='｜種族專屬：'+raceInfo.unitDesc;}if(!isUnit){var notes={eng_repair_bastion:'自律維修堡壘：持續修復周圍友方建築',eng_orbital_array:'軌道火力陣列：超遠射程自動重砲防禦',iron_war_foundry:'帝國戰爭鑄造廠：中程自動火力支援',iron_dread_fortress:'鋼鐵末日要塞：高耐久、遠程重火力',ranger_living_grove:'遠古生命樹庭：持續治療周圍友軍單位',ranger_sky_obelisk:'天穹觀測方尖碑：超遠射程精準防禦',nomad_caravanserai:'黃金商旅驛站：每秒產生金礦收入',nomad_sun_spire:'烈日神殿尖塔：高傷害自動防禦',wall:'城牆：阻擋敵方地面部隊；己方部隊可以自由通過',cannon:'重砲塔：330 射程，105 傷害，適合遠距離重創敵方戰車與建築',missile:'飛彈發射井：285 射程，52 傷害，快速攔截敵方部隊',wonder:'文明躍進核心：每階段選擇軍事或經濟永久加成；升級奇觀才能進入下一時代',lab:'開啟所屬文明的專屬科技樹',bunker:'自動攻擊 175 範圍內敵軍',depot:'附近友軍緩慢恢復生命',meatFarm:'附近肉採集效率 +50%，可交付肉',woodshop:'附近木材採集效率 +50%，可交付木材',goldmine:'附近油田採集效率 +50%，可交付金礦',fort:'周圍友軍每秒恢復 7 HP；可設為部隊集結點',turret:'自動攻擊 210 範圍內的敵軍',meatFarm:'獵場：肉採集效率 +50%，可交付肉',woodshop:'木材加工所：木材採集效率 +50%，可交付木材',goldmine:'金礦場：金礦採集效率 +50%，可交付金礦'};info+='　'+(notes[o.type]||'基地設施');if(Array.isArray(o.queue)&&o.queue.length)info+='　生產中 '+o.queue.length;}detail.textContent=info;ui.selection.replaceChildren(title,detail);
 }
 function unitLevel(team,type){return ((teamUnitLevels[team]||{})[type]||1)}
-function unitUpgradeCost(level){return [null,null,{wood:100,ore:80},{wood:180,ore:160,oil:40},{wood:280,ore:260,oil:100},{wood:420,ore:400,oil:180}][level]}
+function unitUpgradeCost(level){return [null,null,{food:100,wood:80},{food:180,wood:160,gold:40},{food:280,wood:260,gold:100},{food:420,wood:400,gold:180}][level]}
 function startUnitUpgrade(team,b,type){var current=unitLevel(team,type),next=current+1;if(!b||b.team!==team||!['barracks','factory','hq'].includes(b.type)||next>5)return false;var roster=factionRosters[teamRaces[team]]||factionRosters.engineers;if(!(roster[b.type]||[]).includes(type))return false;if(buildings.some(x=>x.team===team&&x.unitUpgrade&&x.unitUpgrade.type===type))return false;var cost=unitUpgradeCost(next),wallet=countryResources[team]||resources;if(!Object.keys(cost).every(k=>(wallet[k]||0)>=cost[k]))return false;Object.keys(cost).forEach(k=>wallet[k]-=cost[k]);b.unitUpgrade={type:type,level:next,remain:12+(next-2)*9};if(team==='p')log(unitName(type,team)+' 開始升級至 '+next+' 級，完成前不影響現有部隊。');return true}
 function finishUnitUpgrade(team,type,next){if(!teamUnitLevels[team])teamUnitLevels[team]={};var old=unitLevel(team,type);if(next!==old+1)return;teamUnitLevels[team][type]=next;units.filter(u=>u.team===team&&u.type===type&&u.hp>0).forEach(u=>{u.max*=1.08;u.hp=Math.min(u.max,u.hp*1.08);u.attackDamage*=1.07});if(team==='p')log(unitName(type,team)+' 已升至 '+next+'/5 級！現有與新生同兵種同步強化。')}
 function queuedPop(b){return (b.queue||[]).reduce((n,q)=>n+(defs[q.type]?defs[q.type].pop:0),0)}
@@ -279,7 +282,7 @@ function train(b,type){var d=defs[type];var isWorker=type==='worker';if(!b||b.te
 function dist(a,b){return Math.hypot(a.x-b.x,a.y-b.y)}
 function nearestNode(u,type){var best=null,bd=1e9;var rear=u.team;var rearNodes=nodes.filter(n=>n.type===type&&n.amount>0&&n.zone===rear);var pool=rearNodes.length?rearNodes:nodes.filter(n=>n.type===type&&n.amount>0&&n.zone==='center');pool.forEach(n=>{var d=dist(u,n);if(d<bd){best=n;bd=d}});return best}
 function nearestNodeAtDepot(u,type){
- var depotType=type==='wood'?'lumber':type==='ore'?'mine':'power';
+ var depotType=type==='food'?'meatFarm':type==='wood'?'woodshop':'goldmine';
  var depots=buildings.filter(b=>b.team===u.team&&b.type===depotType&&b.hp>0);
  if(!depots.length)return nearestNode(u,type);
  var choices=[];
@@ -295,10 +298,10 @@ function nearestNodeAtDepot(u,type){
 }
 function autoAssignWorkerResource(u){
  if(u.order||u.carry>0)return false;
- var services=buildings.filter(b=>b.team===u.team&&b.hp>0&&['lumber','mine','power'].includes(b.type)&&dist(u,b)<=250);
+ var services=buildings.filter(b=>b.team===u.team&&b.hp>0&&['meatFarm','woodshop','goldmine'].includes(b.type)&&dist(u,b)<=250);
  services.sort((a,b)=>dist(u,a)-dist(u,b));
  for(var i=0;i<services.length;i++){
-  var b=services[i],type=b.type==='lumber'?'wood':b.type==='mine'?'ore':'oil';
+  var b=services[i],type=b.type==='meatFarm'?'food':b.type==='woodshop'?'wood':'gold';
   var local=nodes.filter(n=>n.type===type&&n.amount>0&&dist(b,n)<=260);
   if(!local.length)continue;
   local.sort((a,c)=>dist(b,a)-dist(b,c)||dist(u,a)-dist(u,c));
@@ -308,7 +311,7 @@ function autoAssignWorkerResource(u){
 }
 function nearestEnemy(u,range){var best=null,bd=range||1e9;units.concat(buildings).forEach(o=>{if(o.team!==u.team&&o.hp>0){var d=dist(u,o);if(d<bd){bd=d;best=o}}});return best}
 function rightClick(x,y){
-if(placing==='wall'){if(!wallStart){wallStart={x:x,y:y};log('城牆起點已設定，請右鍵設定終點。');return}var sx=wallStart.x,sy=wallStart.y,dx=x-sx,dy=y-sy,len=Math.hypot(dx,dy);if(len<30){log('終點距離太近，請重新設定。');return}var count=Math.max(1,Math.ceil(len/76)),angle=Math.atan2(dy,dx),d=buildingDefs.wall,points=[];for(var wi=0;wi<count;wi++){var t=(wi+.5)/count,wx=sx+dx*t,wy=sy+dy*t;if(!canBuildAt('wall',wx,wy)||buildings.some(b=>b.type==='wall'&&dist(b,{x:wx,y:wy})<58)){log('城牆路線碰到既有建築或超出地圖，請重新選擇起終點。');wallStart=null;return}points.push({x:wx,y:wy})}var total={wood:d.cost.wood*count,ore:d.cost.ore*count};if(!canPay(total)){log('資源不足：這段城牆需要 '+costText(total));wallStart=null;return}pay(total);points.forEach(p=>{var wb=makeBuilding('p','wall',p.x,p.y);wb.angle=angle});log('連續城牆完成：'+count+' 段。');placing=null;wallStart=null;updateUI();return}if(placing){var d=buildingDefs[placing];if(!canBuildAt(placing,x,y)){log('建造失敗：此處與己方／敵方建築重疊，或超出地圖範圍。');return}if(eras.p<minEraForBuilding(placing)){log('尚未進入可建造此設施的時代');return}if(!pay(d.cost)){log('資源不足');return}var built=makeBuilding('p',placing,x,y);if(placing==='wonder'){wonderLevels.p=1;built.level=1;log('世界奇觀落成！選取奇觀，選擇軍事或經濟文明加成。')}else if(placing==='hq'){log('主堡重建完成！你重新取得文明升級與平民生產能力。')}else log('完成建造：'+buildingName(placing,'p'));placing=null;updateUI();return}
+if(placing==='wall'){if(!wallStart){wallStart={x:x,y:y};log('城牆起點已設定，請右鍵設定終點。');return}var sx=wallStart.x,sy=wallStart.y,dx=x-sx,dy=y-sy,len=Math.hypot(dx,dy);if(len<30){log('終點距離太近，請重新設定。');return}var count=Math.max(1,Math.ceil(len/76)),angle=Math.atan2(dy,dx),d=buildingDefs.wall,points=[];for(var wi=0;wi<count;wi++){var t=(wi+.5)/count,wx=sx+dx*t,wy=sy+dy*t;if(!canBuildAt('wall',wx,wy)||buildings.some(b=>b.type==='wall'&&dist(b,{x:wx,y:wy})<58)){log('城牆路線碰到既有建築或超出地圖，請重新選擇起終點。');wallStart=null;return}points.push({x:wx,y:wy})}var total={food:d.cost.food*count,wood:d.cost.wood*count};if(!canPay(total)){log('資源不足：這段城牆需要 '+costText(total));wallStart=null;return}pay(total);points.forEach(p=>{var wb=makeBuilding('p','wall',p.x,p.y);wb.angle=angle});log('連續城牆完成：'+count+' 段。');placing=null;wallStart=null;updateUI();return}if(placing){var d=buildingDefs[placing];if(!canBuildAt(placing,x,y)){log('建造失敗：此處與己方／敵方建築重疊，或超出地圖範圍。');return}if(eras.p<minEraForBuilding(placing)){log('尚未進入可建造此設施的時代');return}if(!pay(d.cost)){log('資源不足');return}var built=makeBuilding('p',placing,x,y);if(placing==='wonder'){wonderLevels.p=1;built.level=1;log('世界奇觀落成！選取奇觀，選擇軍事或經濟文明加成。')}else if(placing==='hq'){log('主堡重建完成！你重新取得文明升級與平民生產能力。')}else log('完成建造：'+buildingName(placing,'p'));placing=null;updateUI();return}
 if(!selected.length)return;
 var friendlyBuilding=buildings.find(o=>o.team==='p'&&o.hp<o.max&&Math.hypot(o.x-x,o.y-y)<Math.max(34,Math.max(buildingDefs[o.type].w,buildingDefs[o.type].h)*.65));if(friendlyBuilding&&selected.some(u=>u.kind==='unit'&&u.type==='worker')){selected.forEach(u=>{if(u.kind==='unit'&&u.type==='worker'&&u.team==='p')u.order={type:'repair',target:friendlyBuilding.id}});log('村民開始維修：'+buildingName(friendlyBuilding.type,'p'));updateUI();return}
 var target=units.concat(buildings).find(o=>o.team!=='p'&&Math.hypot(o.x-x,o.y-y)<Math.max(22,o.kind==='building'?40:20));
@@ -333,7 +336,7 @@ if(o.team==='p'){
   if(techs.sandstorm&&o.type==='raider')sp*=1.10;
 }var step=Math.min(d,sp*dt),nx=o.x+dx/d*step,ny=o.y+dy/d*step;o.moving=true;o.walkPhase=(o.walkPhase||0)+dt*11;o.facing=Math.atan2(dy,dx);var wall=buildings.find(b=>b.type==='wall'&&b.team!==o.team&&b.hp>0&&(()=>{var a=-(b.angle||0),rx=(nx-b.x)*Math.cos(a)-(ny-b.y)*Math.sin(a),ry=(nx-b.x)*Math.sin(a)+(ny-b.y)*Math.cos(a);return Math.abs(rx)<buildingDefs.wall.w/2+9&&Math.abs(ry)<buildingDefs.wall.h/2+9})());if(wall){o.blockedBy=wall.id;return}o.x=nx;o.y=ny}else{o.moving=false}}
 function findById(id){return units.concat(buildings).find(o=>o.id===id)}
-function tryNomadPlunder(attacker,target,damage){if(!attacker||!target||attacker.kind!=='unit'||target.kind!=='unit'||attacker.team===target.team||teamRaces[attacker.team]!=='nomads'||!(damage>0)||Math.random()>=.35)return;var wallet=countryResources[attacker.team]||(attacker.team==='p'?resources:null);if(!wallet)return;var keys=['wood','ore','oil'],key=keys[Math.floor(Math.random()*keys.length)],amount=3+Math.floor(Math.random()*6);wallet[key]=(wallet[key]||0)+amount;if(attacker.team==='p'&&countryResources.p!==resources)resources=wallet;}
+function tryNomadPlunder(attacker,target,damage){if(!attacker||!target||attacker.kind!=='unit'||target.kind!=='unit'||attacker.team===target.team||teamRaces[attacker.team]!=='nomads'||!(damage>0)||Math.random()>=.35)return;var wallet=countryResources[attacker.team]||(attacker.team==='p'?resources:null);if(!wallet)return;var keys=['food','wood','gold'],key=keys[Math.floor(Math.random()*keys.length)],amount=3+Math.floor(Math.random()*6);wallet[key]=(wallet[key]||0)+amount;if(attacker.team==='p'&&countryResources.p!==resources)resources=wallet;}
 function shoot(a,t,d,dt){if(!t||t.hp<=0)return;var dd=dist(a,t),range=a.attackRange||d.range;if(dd>range){moveTo(a,t.x,t.y,dt);return}a.facing=Math.atan2(t.y-a.y,t.x-a.x);a.cool-=dt;if(a.cool<=0){a.cool=a.attackRate||d.rate;a.fireAnim=.24;var damage=a.attackDamage||d.damage,role=(a.combat&&a.combat.role)||d.role||'ranged';if(role==='melee'){if(t.kind==='building')damage*=2.25;var dealt=Math.min(Math.max(0,t.hp),damage);t.hp-=damage;tryNomadPlunder(a,t,dealt);effects.push({x:t.x,y:t.y,t:.22,hit:true});if(t.hp>0&&t.team!==a.team)callDefenders(t,a);return;}var muzzle=a.type==='marksman'?20:a.type==='rocket'?17:a.type==='artillery'?22:15;var splash=({rocket:34,artillery:66,eng_siege:78,iron_mortar:72,ranger_ballista:58,nomad_bombard:68,eng_colossus:90,iron_dreadnought:100,ranger_skybreaker:82,nomad_meteor:88,cannon:82,missile:54})[a.type]||0;bullets.push({x:a.x+Math.cos(a.facing)*muzzle,y:a.y+Math.sin(a.facing)*muzzle,tx:t.x,ty:t.y,team:a.team,source:a.id,damage:damage,speed:a.type==='marksman'?430:a.type==='artillery'?260:340,type:a.type,splash:splash})}}
 function callDefenders(threatened,attacker){if(!threatened||!attacker||attacker.kind!=='unit'||attacker.type==='worker'||attacker.type==='medic')return;var side=threatened.team;var hostiles=units.filter(v=>v.team!==side&&v.hp>0&&v.type!=='worker'&&v.type!=='medic'&&dist(v,threatened)<310);if(!hostiles.length)return;hostiles.sort((a,b)=>{var aa=a.id===attacker.id?-1:0,bb=b.id===attacker.id?-1:0;return aa-bb||(a.hp/a.max)-(b.hp/b.max)||a.hp-b.hp||dist(threatened,a)-dist(threatened,b)});var focus=hostiles[0];units.filter(u=>u.team===side&&u.hp>0&&u.type!=='worker'&&u.type!=='medic'&&dist(u,threatened)<245).forEach(u=>{u.order={type:'attack',target:focus.id};u.target=focus.id;});}
 function rangedTactics(u,target,dt){
@@ -384,14 +387,14 @@ u.fireAnim=Math.max(0,(u.fireAnim||0)-dt);u.moving=false;
 var d=defs[u.type];if(u.type==='medic'){var patient=units.filter(v=>v.team===u.team&&v!==u&&v.hp>0&&v.hp<v.max&&dist(u,v)<180).sort((a,b)=>(a.hp/a.max)-(b.hp/b.max))[0];if(patient){if(dist(u,patient)>28)moveTo(u,patient.x,patient.y,dt);else patient.hp=Math.min(patient.max,patient.hp+13*dt)}return}if(u.type!=='worker'&&u.order?.type!=='heal'&&u.hp/u.max<=.35){var healers=units.filter(v=>v.team===u.team&&v.type==='medic'&&v.hp>0).concat(buildings.filter(b=>b.team===u.team&&b.hp>0&&(b.type==='fort'||b.type==='depot')));healers=healers.filter(v=>dist(u,v)<650).sort((a,b)=>dist(u,a)-dist(u,b));if(healers.length){u.autoHealReturnOrder=u.order?Object.assign({},u.order):null;u.autoHealTarget=healers[0].id;u.order={type:'heal',target:healers[0].id};}}if(u.order&&u.order.type==='heal'){var hs=findById(u.order.target);if(!hs||hs.hp<=0||u.hp/u.max>=.82){u.order=u.autoHealReturnOrder||null;u.autoHealReturnOrder=null;u.autoHealTarget=null;}else{var radius=hs.type==='fort'||hs.type==='depot'?62:26;if(dist(u,hs)>radius)moveTo(u,hs.x,hs.y,dt);return}}if(u.order&&u.order.type==='move'){moveTo(u,u.order.x,u.order.y,dt);if(Math.hypot(u.x-u.order.x,u.y-u.order.y)<7)u.order=null;return}
 if(u.type==='worker'){
 if(!u.order)autoAssignWorkerResource(u);
-if(!u.order||u.order.type!=='repair'){var nearbyDamaged=buildings.filter(b=>b.team===u.team&&b.hp>0&&b.hp<b.max-1&&dist(u,b)<=190).sort((a,b)=>dist(u,a)-dist(u,b))[0];if(nearbyDamaged&&(countryResources[u.team]||resources).wood>=3){u.autoRepairReturnOrder=u.order?Object.assign({},u.order):null;u.order={type:'repair',target:nearbyDamaged.id,auto:true};}}
-if(u.order&&u.order.type==='repair'){var rb=findById(u.order.target);if(!rb||rb.kind!=='building'||rb.team!==u.team||rb.hp>=rb.max){u.order=u.order.auto?u.autoRepairReturnOrder||null:null;u.autoRepairReturnOrder=null;}else{var rr=Math.max(buildingDefs[rb.type].w,buildingDefs[rb.type].h)*.65;if(dist(u,rb)>rr)moveTo(u,rb.x,rb.y,dt);else{var wallet=countryResources[u.team]||resources;var repairRate=15*(raceDefs[teamRaces[u.team]||'engineers'].workerBuild||1);if(u.team==='p'&&techs.auto_repair)repairRate*=1.5;var repairHP=Math.min(repairRate*dt,(wallet.wood||0)*5);if(repairHP>0){wallet.wood-=repairHP/5;rb.hp=Math.min(rb.max,rb.hp+repairHP)}else{u.order=u.order.auto?u.autoRepairReturnOrder||null:null;u.autoRepairReturnOrder=null;if(u.team==='p')log('木材不足，村民停止維修')}}}return}
-if(u.order&&u.order.type==='gather'){var n=u.order.node;if(!n||n.amount<=0){n=nearestNodeAtDepot(u,u.resource||'wood');u.order.node=n;if(!n){u.order=null;return}}if(dist(u,n)>22){moveTo(u,n.x,n.y,dt)}else{u.gatherTime=(u.gatherTime||0)+dt;if(u.gatherTime>=1){u.gatherTime=0;var nearby=buildings.find(b=>b.team===u.team&&b.type===(n.type==='wood'?'lumber':n.type==='ore'?'mine':'power')&&dist(b,n)<260);var rate=(raceDefs[teamRaces[u.team]||'engineers'].gather||1)*(1+Math.min(1.5,wonderBuffs[u.team].economy*.25));
+if(!u.order||u.order.type!=='repair'){var nearbyDamaged=buildings.filter(b=>b.team===u.team&&b.hp>0&&b.hp<b.max-1&&dist(u,b)<=190).sort((a,b)=>dist(u,a)-dist(u,b))[0];if(nearbyDamaged&&(countryResources[u.team]||resources).food>=3){u.autoRepairReturnOrder=u.order?Object.assign({},u.order):null;u.order={type:'repair',target:nearbyDamaged.id,auto:true};}}
+if(u.order&&u.order.type==='repair'){var rb=findById(u.order.target);if(!rb||rb.kind!=='building'||rb.team!==u.team||rb.hp>=rb.max){u.order=u.order.auto?u.autoRepairReturnOrder||null:null;u.autoRepairReturnOrder=null;}else{var rr=Math.max(buildingDefs[rb.type].w,buildingDefs[rb.type].h)*.65;if(dist(u,rb)>rr)moveTo(u,rb.x,rb.y,dt);else{var wallet=countryResources[u.team]||resources;var repairRate=15*(raceDefs[teamRaces[u.team]||'engineers'].workerBuild||1);if(u.team==='p'&&techs.auto_repair)repairRate*=1.5;var repairHP=Math.min(repairRate*dt,(wallet.food||0)*5);if(repairHP>0){wallet.food-=repairHP/5;rb.hp=Math.min(rb.max,rb.hp+repairHP)}else{u.order=u.order.auto?u.autoRepairReturnOrder||null:null;u.autoRepairReturnOrder=null;if(u.team==='p')log('肉不足，村民停止維修')}}}return}
+if(u.order&&u.order.type==='gather'){var n=u.order.node;if(!n||n.amount<=0){n=nearestNodeAtDepot(u,u.resource||'food');u.order.node=n;if(!n){u.order=null;return}}if(dist(u,n)>22){moveTo(u,n.x,n.y,dt)}else{u.gatherTime=(u.gatherTime||0)+dt;if(u.gatherTime>=1){u.gatherTime=0;var nearby=buildings.find(b=>b.team===u.team&&b.type===(n.type==='food'?'meatFarm':n.type==='wood'?'woodshop':'goldmine')&&dist(b,n)<260);var rate=(raceDefs[teamRaces[u.team]||'engineers'].gather||1)*(1+Math.min(1.5,wonderBuffs[u.team].economy*.25));
 if(u.team==='p'&&techs.eff_gather)rate*=1.25;
 var amount=Math.min((nearby?12:8)*rate,n.amount);n.amount-=amount;u.carry+=amount;u.resource=n.type;
 var carryCap=(raceDefs[teamRaces[u.team]||'engineers'].workerBuild?50:40);if(u.team==='p'&&techs.plunder)carryCap+=12;
-if(u.carry>=carryCap||n.amount<=0){var depot=buildings.filter(b=>b.team===u.team&&b.type===(u.resource==='wood'?'lumber':u.resource==='ore'?'mine':'power')).sort((a,b)=>dist(u,a)-dist(u,b))[0]||buildings.find(b=>b.team===u.team&&b.type==='hq');if(depot){u.order={type:'return',home:depot.id};}}}}}
-else if(u.order&&u.order.type==='return'){var h=findById(u.order.home);if(h&&dist(u,h)>28)moveTo(u,h.x,h.y,dt);else if(h){var wallet=countryResources[u.team]||resources;wallet[u.resource]=(wallet[u.resource]||0)+u.carry;u.carry=0;u.order={type:'gather',node:nearestNodeAtDepot(u,u.resource)||nearestNode(u,'wood'),auto:true};}}
+if(u.carry>=carryCap||n.amount<=0){var depot=buildings.filter(b=>b.team===u.team&&b.type===(u.resource==='food'?'meatFarm':u.resource==='wood'?'woodshop':'goldmine')).sort((a,b)=>dist(u,a)-dist(u,b))[0]||buildings.find(b=>b.team===u.team&&b.type==='hq');if(depot){u.order={type:'return',home:depot.id};}}}}}
+else if(u.order&&u.order.type==='return'){var h=findById(u.order.home);if(h&&dist(u,h)>28)moveTo(u,h.x,h.y,dt);else if(h){var wallet=countryResources[u.team]||resources;wallet[u.resource]=(wallet[u.resource]||0)+u.carry;u.carry=0;u.order={type:'gather',node:nearestNodeAtDepot(u,u.resource)||nearestNode(u,'food'),auto:true};}}
 else{var threat=nearestEnemy(u,110);if(threat&&threat.kind==='unit'&&threat.type!=='worker')shoot(u,threat,d,dt)}
 return}
 var t=u.order&&u.order.type==='attack'?findById(u.order.target):nearestEnemy(u,(u.attackRange||d.range)+80);if(u.blockedBy){var blockingWall=findById(u.blockedBy);if(blockingWall&&blockingWall.team!==u.team)t=blockingWall;}
@@ -417,19 +420,20 @@ if(b.type==='turret'){var target=nearestEnemy(b,210);if(target){b.cool=(b.cool||
 if(b.type==='bunker'){var bt=nearestEnemy(b,175);if(bt){b.cool=(b.cool||0)-dt;if(b.cool<=0){b.cool=1.25;bullets.push({x:b.x,y:b.y,tx:bt.x,ty:bt.y,team:b.team,source:b.id,damage:13,speed:380,type:'bunker'})}}}
 if(b.type==='cannon'){var ct=nearestEnemy(b,275);if(ct){b.cool=(b.cool||0)-dt;if(b.cool<=0){b.cool=3.4;bullets.push({x:b.x,y:b.y,tx:ct.x,ty:ct.y,team:b.team,source:b.id,damage:100,speed:560,type:'cannon'})}}}
 if(b.type==='missile'){var mt=nearestEnemy(b,285);if(mt){b.cool=(b.cool||0)-dt;if(b.cool<=0){b.cool=1.75;bullets.push({x:b.x,y:b.y,tx:mt.x,ty:mt.y,team:b.team,source:b.id,damage:52,speed:470,type:'missile'})}}}
-if(b.type==='depot'){units.forEach(u=>{if(u.team===b.team&&u.type!=='worker'&&dist(u,b)<100)u.hp=Math.min(u.max,u.hp+2*dt)});}
+var bd=buildingDefs[b.type];if(bd){if(bd.auraHealBuildings)buildings.forEach(v=>{if(v.team===b.team&&v.hp>0&&v!==b&&dist(v,b)<175)v.hp=Math.min(v.max,v.hp+bd.auraHealBuildings*dt)});if(bd.auraHealUnits)units.forEach(v=>{if(v.team===b.team&&v.hp>0&&dist(v,b)<185)v.hp=Math.min(v.max,v.hp+bd.auraHealUnits*dt)});if(bd.passiveIncome){var wallet=countryResources[b.team]||resources;Object.keys(bd.passiveIncome).forEach(k=>wallet[k]=(wallet[k]||0)+bd.passiveIncome[k]*dt)}if(bd.defenseRange){var foe=nearestEnemy(b,bd.defenseRange);if(foe){b.cool=(b.cool||0)-dt;if(b.cool<=0){b.cool=bd.defenseRate;bullets.push({x:b.x,y:b.y,tx:foe.x,ty:foe.y,team:b.team,source:b.id,damage:bd.defenseDamage,speed:520,type:'factionDefense'})}}}}
+ if(b.type==='depot'){units.forEach(u=>{if(u.team===b.team&&u.type!=='worker'&&dist(u,b)<100)u.hp=Math.min(u.max,u.hp+2*dt)});}
 }
 function findOpenBuildingSpot(type,x,y){for(var r=0;r<=260;r+=35){for(var a=0;a<8;a++){var ang=a*Math.PI/4,px=Math.max(45,Math.min(W-45,x+Math.cos(ang)*r)),py=Math.max(45,Math.min(H-45,y+Math.sin(ang)*r));if(canBuildAt(type,px,py))return{x:px,y:py}}}return null}
 
 function teamPowerScore(team){
  var army=units.filter(u=>u.team===team&&u.hp>0),structures=buildings.filter(b=>b.team===team&&b.hp>0);
  var uv={worker:2,melee:5,rifle:8,rocket:10,tank:22,artillery:24,scout:8,medic:8,heavy:34,warden:13,breaker:16,marksman:12,raider:17,eng_colossus:38,iron_dreadnought:44,ranger_skybreaker:36,nomad_meteor:38};
- var bv={hq:65,barracks:18,factory:22,lumber:7,mine:8,power:8,turret:13,fort:22,lab:18,bunker:15,cannon:24,missile:23,depot:12,house:5,wonder:55,wall:1};
+ var bv={hq:65,barracks:18,factory:22,meatFarm:7,woodshop:8,goldmine:8,turret:13,fort:22,lab:18,bunker:15,cannon:24,missile:23,depot:12,house:5,wonder:55,wall:1};
  var score=0;
  army.forEach(u=>score+=(uv[u.type]||8)*(0.45+0.55*u.hp/u.max));
  structures.forEach(b=>score+=(bv[b.type]||5)*(0.35+0.65*b.hp/b.max));
- var w=countryResources[team]||{wood:0,ore:0,oil:0};
- score+=Math.min(35,(w.wood||0)/45)+Math.min(45,(w.ore||0)/40)+Math.min(35,(w.oil||0)/30);
+ var w=countryResources[team]||{food:0,wood:0,gold:0};
+ score+=Math.min(35,(w.food||0)/45)+Math.min(45,(w.wood||0)/40)+Math.min(35,(w.gold||0)/30);
  score+=(eras[team]||0)*13+(wonderLevels[team]||0)*9;
  return score;
 }
@@ -441,7 +445,7 @@ function refreshStrategicIntel(){
  aiIntel={power:power,leader:leader,coalition:leader==='p'&&rivals.length>=2&&power.p>avg*1.28&&rivals.every(t=>power.p>power[t]*1.12)};
 }
 function assessAI(team){
- var mind=aiMind[team],wallet=countryResources[team]||{wood:0,ore:0,oil:0};
+ var mind=aiMind[team],wallet=countryResources[team]||{food:0,wood:0,gold:0};
  var own=aiIntel.power[team]||teamPowerScore(team),enemyMax=0;
  ['p','e','n','s'].filter(t=>t!==team).forEach(t=>enemyMax=Math.max(enemyMax,aiIntel.power[t]||0));
  var ownArmy=units.filter(u=>u.team===team&&u.hp>0&&!['worker','medic'].includes(u.type));
@@ -462,14 +466,14 @@ function chooseStrategicTarget(team,ehq,posture){
  var targetTeam;
  if(aiIntel.coalition)targetTeam='p';
  else{
-   rivals.sort((a,b)=>(aiIntel.power[b]||0)-(aiIntel.power[a]||0));
+   rivals.sort((a,b)=>(aiIntel.goldmine[b]||0)-(aiIntel.goldmine[a]||0));
    targetTeam=rivals[0];
  }
  var targets=buildings.filter(b=>b.team===targetTeam&&b.hp>0);
  if(!targets.length)return null;
  var role={e:'economy',n:'production',s:'defense'}[team]||'economy';
- var preferred=targets.filter(b=>role==='economy'?['lumber','mine','power'].includes(b.type):role==='production'?['barracks','factory','lab'].includes(b.type):['fort','turret','bunker','cannon','missile'].includes(b.type));
- if(posture==='behind'||posture==='desperate')preferred=targets.filter(b=>['lumber','mine','power','barracks','factory','lab'].includes(b.type));
+ var preferred=targets.filter(b=>role==='economy'?['meatFarm','woodshop','goldmine'].includes(b.type):role==='production'?['barracks','factory','lab'].includes(b.type):['fort','turret','bunker','cannon','missile'].includes(b.type));
+ if(posture==='behind'||posture==='desperate')preferred=targets.filter(b=>['meatFarm','woodshop','goldmine','barracks','factory','lab'].includes(b.type));
  if(!preferred.length)preferred=targets.filter(b=>b.type==='hq');
  if(!preferred.length)preferred=targets;
  preferred.sort((a,b)=>dist(ehq,a)-dist(ehq,b));
@@ -489,12 +493,12 @@ function enemyAIFor(team,dt){
  var workers=units.filter(u=>u.team===team&&u.type==='worker'&&u.hp>0);
  // 落後勢力可獲得有限的緊急徵用物資；只補資源、不生成免費單位，且有庫存上限。
  mind.supply=(mind.supply||0)+dt;
- var lowStock=(enemyResources.wood<90?1:0)+(enemyResources.ore<65?1:0)+(enemyResources.oil<35?1:0)>=2;
+ var lowStock=(enemyResources.food<90?1:0)+(enemyResources.wood<65?1:0)+(enemyResources.gold<35?1:0)>=2;
  if((mind.posture==='behind'||mind.posture==='desperate')&&lowStock&&workers.length&&mind.supply>=60){
    mind.supply=0;
-   enemyResources.wood=Math.min(180,enemyResources.wood+35);
-   enemyResources.ore=Math.min(120,enemyResources.ore+20);
-   enemyResources.oil=Math.min(70,enemyResources.oil+10);
+   enemyResources.food=Math.min(180,enemyResources.food+35);
+   enemyResources.wood=Math.min(120,enemyResources.wood+20);
+   enemyResources.gold=Math.min(70,enemyResources.gold+10);
    log(team+' 方陷入絕境，啟動一次緊急徵用補給（有限度）。');
  }
  // 主堡被摧毀但仍有工程平民時，AI 會先求生重建，而不是整個停擺。
@@ -506,27 +510,27 @@ function enemyAIFor(team,dt){
    }
    return;
  }
- // 工人不設獨立數量上限；與玩家相同，透過主堡佇列、支付木材並佔用人口生產。
+ // 工人不設獨立數量上限；與玩家相同，透過主堡佇列、支付肉並佔用人口生產。
  var queuedWorkers=buildings.filter(b=>b.team===team).reduce((sum,b)=>sum+(b.queue||[]).filter(q=>q.type==='worker').length,0);
  var queuedPopNow=buildings.filter(b=>b.team===team).reduce((sum,b)=>sum+(b.queue||[]).reduce((n,q)=>n+(defs[q.type]?.pop||0),0),0);
  var workerHQ=buildings.find(b=>b.team===team&&b.type==='hq');
- if(elapsed>12&&workerHQ&&workerHQ.queue.length===0&&countPop(team)+queuedPopNow<teamPopCap(team)&&canPayE({wood:50})){
-   enemyResources.wood-=50;workerHQ.queue.push({type:'worker',remain:defs.worker.time});
+ if(elapsed>12&&workerHQ&&workerHQ.queue.length===0&&countPop(team)+queuedPopNow<teamPopCap(team)&&canPayE({food:50})){
+   enemyResources.food-=50;workerHQ.queue.push({type:'worker',remain:defs.worker.time});
  }
- var targets=eras[team]>=2?{wood:1150,ore:1450,oil:1050}:eras[team]>=1?{wood:1050,ore:1000,oil:650}:{wood:900,ore:700,oil:350};
- if(wonderLevels[team]===0)targets.wood+=350,targets.ore+=250,targets.oil+=100;
- if(wonderLevels[team]===1)targets.wood+=450,targets.ore+=400,targets.oil+=250;
- if(wonderLevels[team]===2)targets.wood+=650,targets.ore+=550,targets.oil+=450;
- var assigned={wood:0,ore:0,oil:0};
- workers.forEach(u=>{if(u.order&&(u.order.type==='gather'||u.order.type==='return'))assigned[u.resource||'wood']++;});
+ var targets=eras[team]>=2?{food:1150,wood:1450,gold:1050}:eras[team]>=1?{food:1050,wood:1000,gold:650}:{food:900,wood:700,gold:350};
+ if(wonderLevels[team]===0)targets.food+=350,targets.wood+=250,targets.gold+=100;
+ if(wonderLevels[team]===1)targets.food+=450,targets.wood+=400,targets.gold+=250;
+ if(wonderLevels[team]===2)targets.food+=650,targets.wood+=550,targets.gold+=450;
+ var assigned={food:0,wood:0,gold:0};
+ workers.forEach(u=>{if(u.order&&(u.order.type==='gather'||u.order.type==='return'))assigned[u.resource||'food']++;});
  // AI 自主評估中央資源：軍力足以護送、庫存吃緊或後方資源逐漸枯竭時，才派小隊前往。
  var enemyArmy=units.filter(u=>u.team===team&&u.hp>0&&!['worker','medic'].includes(u.type));
  var playerArmyNearCenter=units.filter(u=>u.team!==team&&u.hp>0&&!['worker','medic'].includes(u.type));
  var centerNodes=nodes.filter(n=>n.zone==='center'&&n.amount>0);
  var centralWorkers=workers.filter(u=>u.order&&u.order.type==='gather'&&u.order.node&&u.order.node.zone==='center').length;
- var rearLeft={wood:0,ore:0,oil:0};
+ var rearLeft={food:0,wood:0,gold:0};
  nodes.forEach(n=>{if(n.zone===team&&rearLeft[n.type]!==undefined)rearLeft[n.type]+=n.amount;});
- var centralNeed=['wood','ore','oil'].map(type=>({type,score:(1-(enemyResources[type]||0)/targets[type])+Math.max(0,1-rearLeft[type]/6500)})).sort((a,b)=>b.score-a.score);
+ var centralNeed=['food','wood','gold'].map(type=>({type,score:(1-(enemyResources[type]||0)/targets[type])+Math.max(0,1-rearLeft[type]/6500)})).sort((a,b)=>b.score-a.score);
  var centralType=centralNeed[0].type;
  var centralNodeFor=(u,type)=>centerNodes.filter(n=>n.type===type).sort((a,b)=>dist(u,a)-dist(u,b))[0]||null;
  var centralCandidate=centralNodeFor(ehq,centralType);
@@ -538,8 +542,8 @@ function enemyAIFor(team,dt){
  workers.sort((a,b)=>a.id-b.id).forEach(u=>{
    if((u.carry||0)>0)return;
    var nodeNow=u.order&&u.order.type==='gather'?u.order.node:null;
-   var current=u.resource||'wood';
-   var choices=['wood','ore','oil'].filter(t=>nearestNode(u,t));
+   var current=u.resource||'food';
+   var choices=['food','wood','gold'].filter(t=>nearestNode(u,t));
    if(!choices.length)return;
    choices.sort((a,b)=>(enemyResources[a]||0)/targets[a]+assigned[a]*.20-((enemyResources[b]||0)/targets[b]+assigned[b]*.20));
    var best=choices[0],switchNeeded=!nodeNow||nodeNow.amount<=0||!u.order||u.order.type!=='gather';
@@ -555,7 +559,7 @@ function enemyAIFor(team,dt){
    var type=switchNeeded?best:current;
    if(switchNeeded){var n=nearestNode(u,type);if(n){if(assigned[current]>0)assigned[current]--;u.resource=type;u.order={type:'gather',node:n};u.gatherTime=0;assigned[type]++;}}
  });
- var eco=[['lumber','wood'],['mine','ore'],['power','oil']];
+ var eco=[['meatFarm','food'],['woodshop','wood'],['goldmine','gold']];
  eco.forEach(pair=>{var have=eb.filter(b=>b.type===pair[0]).length,desired=eras[team]>=2?2:1;if(have<desired){var n=nodes.filter(n=>n.type===pair[1]&&n.amount>0).sort((a,b)=>dist(ehq,a)-dist(ehq,b))[have%Math.max(1,nodes.filter(n=>n.type===pair[1]&&n.amount>0).length)],c=buildingDefs[pair[0]].cost;
  if(n&&Object.keys(c).every(k=>(enemyResources[k]||0)>=c[k])){var p=findOpenBuildingSpot(pair[0],n.x-55-(have*35),n.y+48+(have*25));if(p){Object.keys(c).forEach(k=>enemyResources[k]-=c[k]);var made=makeBuilding(team,pair[0],p.x,p.y);eb.push(made);}}}});
  var ew=buildings.find(b=>b.team===team&&b.type==='wonder');
@@ -572,14 +576,14 @@ function enemyAIFor(team,dt){
  ew=buildings.find(b=>b.team===team&&b.type==='wonder');
  if(ew&&wonderLevels[team]===1&&canWonderUpgrade(team,2)&&canPayE(wonderUpgradeCost(2))){payE(wonderUpgradeCost(2));wonderLevels[team]=2;ew.level=2;ew.max+=500;ew.hp=Math.min(ew.max,ew.hp+500);grantWonderBuff(team,'economy');}
  if(eras[team]===1&&canAdvance(team,2)&&canPayE(eraCost(2)))advanceEra(team);
- if(eras[team]>=2){
+ if(eras[team]>=2){var fbr=factionBuildingRosters[teamRaces[team]];if(fbr&&!eb.some(b=>b.type===fbr.era3))buildE(fbr.era3,ehq.x+215,ehq.y-205);
    if(!eb.some(b=>b.type==='depot'))buildE('depot',ehq.x-180,ehq.y+210);
    if(elapsed>190&&eb.filter(b=>b.type==='factory').length<2)buildE('factory',ehq.x-265,ehq.y-155);
  }
  ew=buildings.find(b=>b.team===team&&b.type==='wonder');
  if(ew&&wonderLevels[team]===2&&canWonderUpgrade(team,3)&&canPayE(wonderUpgradeCost(3))){payE(wonderUpgradeCost(3));wonderLevels[team]=3;ew.level=3;ew.max+=500;ew.hp=Math.min(ew.max,ew.hp+500);grantWonderBuff(team,'military');}
  if(eras[team]===2&&canAdvance(team,3)&&canPayE(eraCost(3)))advanceEra(team);
- if(eras[team]>=3){mind.programTimer=(mind.programTimer||0)+dt;if(mind.programTimer>=38){mind.programTimer=0;upgradeMilitaryProgram(team);}}
+ if(eras[team]>=3){var fbr4=factionBuildingRosters[teamRaces[team]];if(fbr4&&!eb.some(b=>b.type===fbr4.era4))buildE(fbr4.era4,ehq.x+250,ehq.y+215);mind.programTimer=(mind.programTimer||0)+dt;if(mind.programTimer>=38){mind.programTimer=0;upgradeMilitaryProgram(team);}}
  // 軍事生產優先：兵營佇列先補滿，避免升級與防禦建築把軍費花光。
  var queuedPop=buildings.filter(b=>b.team===team).reduce((sum,b)=>sum+(b.queue||[]).reduce((n,q)=>n+(defs[q.type]?.pop||0),0),0);
  var pop=countPop(team)+queuedPop,cap=teamPopCap(team);
@@ -618,7 +622,7 @@ function enemyAIFor(team,dt){
  mind.raid=(mind.raid||0)+dt;
  var raidDelay=mind.posture==='desperate'?42:mind.posture==='behind'?55:78;
  if(!assessment.nearbyThreat&&mind.raid>raidDelay){
-   var raidTargets=buildings.filter(b=>b.team==='p'&&b.hp>0&&['lumber','mine','power'].includes(b.type)).sort((a,b)=>dist(ehq,a)-dist(ehq,b));
+   var raidTargets=buildings.filter(b=>b.team==='p'&&b.hp>0&&['meatFarm','woodshop','goldmine'].includes(b.type)).sort((a,b)=>dist(ehq,a)-dist(ehq,b));
    var raiders=units.filter(u=>u.team===team&&u.hp>0&&!['worker','medic'].includes(u.type)&&!u.order);
    if(raidTargets.length&&raiders.length>=2){
      var raidIndex=team==='e'?0:team==='n'?1:2;
@@ -718,32 +722,9 @@ for(var x=0;x<W;x+=42)for(var y=0;y<H;y+=42){
 ctx.fillStyle='rgba(60,70,45,.25)';ctx.fillRect(W/2-28,0,56,H);
 ctx.fillStyle='rgba(90,100,60,.15)';ctx.fillRect(W/2-8,0,16,H);
 
-/* ===== Resources ===== */
-nodes.filter(n=>fogWasSeen(n.x,n.y)).forEach(n=>{
-  ctx.save();ctx.translate(n.x,n.y);
-  if(n.type==='wood'){
-    // multi-layer tree
-    ctx.fillStyle='#1a3a28';ctx.beginPath();ctx.arc(0,2,20,0,7);ctx.fill();
-    ctx.fillStyle='#2d6a42';ctx.beginPath();ctx.arc(-6,-6,14,0,7);ctx.fill();
-    ctx.fillStyle='#3d8a55';ctx.beginPath();ctx.arc(5,-10,12,0,7);ctx.fill();
-    ctx.fillStyle='#4a9a62';ctx.beginPath();ctx.arc(0,-14,9,0,7);ctx.fill();
-    ctx.fillStyle='#5a3a22';ctx.fillRect(-3.5,4,7,16);
-    ctx.fillStyle='#6b4a2e';ctx.fillRect(-2.5,6,5,12);
-  }else if(n.type==='ore'){
-    ctx.fillStyle='#4a5560';ctx.beginPath();ctx.moveTo(-18,12);ctx.lineTo(-12,-14);ctx.lineTo(4,-20);ctx.lineTo(20,6);ctx.lineTo(8,16);ctx.closePath();ctx.fill();
-    ctx.fillStyle='#7a8a95';ctx.beginPath();ctx.moveTo(-10,4);ctx.lineTo(-4,-10);ctx.lineTo(10,-8);ctx.lineTo(12,8);ctx.closePath();ctx.fill();
-    ctx.fillStyle='#c0d0d8';ctx.fillRect(-4,-8,7,5);ctx.fillStyle='#a0b0b8';ctx.fillRect(2,-2,5,4);
-  }else{ // oil
-    ctx.fillStyle='#0d141c';ctx.beginPath();ctx.ellipse(0,2,26,15,0,0,7);ctx.fill();
-    ctx.fillStyle='#1a2835';ctx.beginPath();ctx.ellipse(0,0,20,11,0,0,7);ctx.fill();
-    ctx.fillStyle='#c9a050';ctx.fillRect(-14,-3,28,5);
-    ctx.fillStyle='#e0c070';ctx.fillRect(-10,-1,20,2);
-    // small pump hint
-    ctx.fillStyle='#3a4a55';ctx.fillRect(-3,-14,6,12);ctx.fillStyle='#5a6a75';ctx.fillRect(-5,-16,10,4);
-  }
-  ctx.restore();
-});
-
+/* ===== Resources: meat, timber, gold ===== */
+nodes.filter(n=>fogWasSeen(n.x,n.y)).forEach(n=>{ctx.save();ctx.translate(n.x,n.y);if(n.type==='food'){ctx.fillStyle='#a88a54';ctx.beginPath();ctx.ellipse(0,2,19,12,0,0,7);ctx.fill();ctx.fillStyle='#c8aa70';ctx.beginPath();ctx.ellipse(9,-7,9,8,0,0,7);ctx.fill();ctx.fillStyle='#7a5935';ctx.beginPath();ctx.moveTo(12,-13);ctx.lineTo(7,-23);ctx.lineTo(16,-17);ctx.lineTo(21,-23);ctx.lineTo(20,-12);ctx.fill();ctx.fillStyle='#302820';ctx.beginPath();ctx.arc(12,-8,1.8,0,7);ctx.fill();ctx.fillStyle='#6c4a2c';ctx.fillRect(-15,8,5,9);ctx.fillRect(7,8,5,9)}else if(n.type==='wood'){ctx.fillStyle='#1a3a28';ctx.beginPath();ctx.arc(0,2,20,0,7);ctx.fill();ctx.fillStyle='#2d6a42';ctx.beginPath();ctx.arc(-6,-6,14,0,7);ctx.fill();ctx.fillStyle='#3d8a55';ctx.beginPath();ctx.arc(5,-10,12,0,7);ctx.fill();ctx.fillStyle='#5a3a22';ctx.fillRect(-3.5,4,7,16)}else{ctx.fillStyle='#4a5058';ctx.beginPath();ctx.moveTo(-18,12);ctx.lineTo(-12,-14);ctx.lineTo(4,-20);ctx.lineTo(20,6);ctx.lineTo(8,16);ctx.closePath();ctx.fill();ctx.fillStyle='#c9a050';ctx.beginPath();ctx.moveTo(-9,4);ctx.lineTo(-3,-10);ctx.lineTo(8,-8);ctx.lineTo(12,8);ctx.closePath();ctx.fill();ctx.fillStyle='#f5d878';ctx.fillRect(-4,-8,7,5);ctx.fillRect(3,0,5,4)}ctx.restore()});
+ 
 /* ===== Buildings (faction-styled) ===== */
 function raceKey(team){return teamRaces[team]||'engineers'}
 function factionPalette(team){
@@ -807,11 +788,11 @@ function styleBuilding(b){
     // smokestacks
     ctx.fillStyle=acc;ctx.fillRect(-d.w*.28,-d.h*.55,10,d.h*.3);ctx.fillRect(d.w*.15,-d.h*.5,10,d.h*.28);
     ctx.fillStyle=light;ctx.fillRect(-d.w*.26,-d.h*.58,6,5);ctx.fillRect(d.w*.17,-d.h*.53,6,5);
-  }else if(b.type==='lumber'||b.type==='mine'||b.type==='power'){
+  }else if(b.type==='meatFarm'||b.type==='woodshop'||b.type==='goldmine'){
     ctx.fillStyle=base;ctx.fillRect(-d.w/2,-d.h/2,d.w,d.h);
     ctx.fillStyle=dark;ctx.fillRect(-d.w*.28,-d.h*.22,d.w*.56,d.h*.48);
-    if(b.type==='lumber'){ctx.fillStyle='#5a3a22';ctx.fillRect(-4,-d.h*.4,8,d.h*.3);ctx.fillStyle='#3a7a4a';ctx.beginPath();ctx.arc(0,-d.h*.42,10,0,7);ctx.fill()}
-    else if(b.type==='mine'){ctx.fillStyle='#6a7078';ctx.beginPath();ctx.moveTo(-12,8);ctx.lineTo(-6,-10);ctx.lineTo(8,-8);ctx.lineTo(12,8);ctx.closePath();ctx.fill()}
+    if(b.type==='meatFarm'){ctx.fillStyle='#5a3a22';ctx.fillRect(-4,-d.h*.4,8,d.h*.3);ctx.fillStyle='#3a7a4a';ctx.beginPath();ctx.arc(0,-d.h*.42,10,0,7);ctx.fill()}
+    else if(b.type==='woodshop'){ctx.fillStyle='#6a7078';ctx.beginPath();ctx.moveTo(-12,8);ctx.lineTo(-6,-10);ctx.lineTo(8,-8);ctx.lineTo(12,8);ctx.closePath();ctx.fill()}
     else{ctx.fillStyle=acc;ctx.fillRect(-6,-d.h*.45,12,d.h*.25);ctx.fillStyle=light;ctx.beginPath();ctx.arc(0,-d.h*.48,7,0,7);ctx.fill()}
   }else if(b.type==='turret'){
     ctx.fillStyle=base;ctx.beginPath();ctx.arc(0,4,18,0,7);ctx.fill();
@@ -1006,7 +987,7 @@ ctx.restore();
 if(mctx){
   var mw=mini.width,mh=mini.height,sx=mw/W,sy=mh/H;
   mctx.clearRect(0,0,mw,mh);mctx.fillStyle='rgba(10,18,24,.22)';mctx.fillRect(0,0,mw,mh);
-  nodes.forEach(n=>{if(n.amount<=0||!fogWasSeen(n.x,n.y))return;mctx.fillStyle=n.type==='wood'?'#3a7a4a':n.type==='ore'?'#7a7a8a':'#6a5a3a';mctx.fillRect(n.x*sx-1.5,n.y*sy-1.5,3,3)});
+  nodes.forEach(n=>{if(n.amount<=0||!fogWasSeen(n.x,n.y))return;mctx.fillStyle=n.type==='food'?'#3a7a4a':n.type==='wood'?'#7a7a8a':'#6a5a3a';mctx.fillRect(n.x*sx-1.5,n.y*sy-1.5,3,3)});
   buildings.forEach(b=>{if(b.hp<=0||(b.team!=='p'&&!fogWasSeen(b.x,b.y)))return;mctx.fillStyle={p:'#68c5e4',e:'#ec7568',n:'#b99be8',s:'#f0c45c'}[b.team]||'#aaa';var s=b.type==='hq'?5:b.type==='wonder'?4:3;mctx.fillRect(b.x*sx-s/2,b.y*sy-s/2,s,s)});
   units.forEach(u=>{if(u.hp<=0||(u.team!=='p'&&!fogCanSee(u.x,u.y)))return;mctx.fillStyle={p:'#68c5e4',e:'#ec7568',n:'#b99be8',s:'#f0c45c'}[u.team]||'#ccc';mctx.fillRect(u.x*sx-1,u.y*sy-1,2,2)});
   mctx.strokeStyle='#536b71';mctx.lineWidth=1;mctx.strokeRect(0.5,0.5,mw-1,mh-1);
@@ -1022,7 +1003,7 @@ document.getElementById('pause').onclick=()=>{if(!started||gameOver)return;pause
 document.getElementById('speed').onclick=()=>{speed=speed===1?2:speed===2?3:1;document.getElementById('speed').textContent='速度 ×'+speed};
 document.getElementById('reset').onclick=()=>{if(confirm('重新開始並重新選擇文明？')){paused=true;started=false;gameOver=false;document.getElementById('overlay').style.display='flex';document.getElementById('pause').textContent='Ⅱ 暫停';document.getElementById('pauseTag').style.display='none'}};
 document.getElementById('save').onclick=()=>{try{localStorage.setItem('frontier_save_v2',JSON.stringify({version:2,teamUnitLevels:teamUnitLevels,resources:resources,countryResources:countryResources,units:units,buildings:buildings,nodes:nodes,elapsed:elapsed,nextId:nextId,eras:eras,techs:techs,wonderLevels:wonderLevels,wonderChosen:wonderChosen,wonderBuffs:wonderBuffs,teamRaces:teamRaces,rallyPoints:rallyPoints,selectedRace:selectedRace}));log('遊戲進度已儲存（完整四國狀態）')}catch(e){log('儲存失敗：'+e.message)}};
-function load(){try{var raw=localStorage.getItem('frontier_save_v2')||localStorage.getItem('frontier_save');if(!raw)return false;var s=JSON.parse(raw);if(!s)return false;resources=s.resources||{wood:600,ore:450,oil:250};countryResources=s.countryResources||{p:resources,e:{wood:600,ore:450,oil:250},n:{wood:600,ore:450,oil:250},s:{wood:600,ore:450,oil:250}};if(s.countryResources)countryResources.p=resources;units=s.units||[];buildings=s.buildings||[];nodes=s.nodes||[];elapsed=s.elapsed||0;nextId=s.nextId||1;eras=s.eras||{p:0,e:0,n:0,s:0};teamUnitLevels=s.teamUnitLevels||{p:{},e:{},n:{},s:{}};techs=Object.assign(emptyTechs(),s.techs||{});wonderLevels=s.wonderLevels||{p:0,e:0,n:0,s:0};wonderChosen=s.wonderChosen||{p:0,e:0,n:0,s:0};wonderBuffs=s.wonderBuffs||{p:{military:0,economy:0},e:{military:0,economy:0},n:{military:0,economy:0},s:{military:0,economy:0}};teamRaces=s.teamRaces||teamRaces;rallyPoints=s.rallyPoints||{p:null,e:null,n:null,s:null};if(s.selectedRace)selectedRace=s.selectedRace;return true}catch(e){console.error(e);return false}}
+function load(){try{var raw=localStorage.getItem('frontier_save_v2')||localStorage.getItem('frontier_save');if(!raw)return false;var s=JSON.parse(raw);if(!s)return false;resources=s.resources||{food:600,wood:450,gold:250};countryResources=s.countryResources||{p:resources,e:{food:600,wood:450,gold:250},n:{food:600,wood:450,gold:250},s:{food:600,wood:450,gold:250}};if(s.countryResources)countryResources.p=resources;units=s.units||[];buildings=s.buildings||[];nodes=s.nodes||[];elapsed=s.elapsed||0;nextId=s.nextId||1;eras=s.eras||{p:0,e:0,n:0,s:0};teamUnitLevels=s.teamUnitLevels||{p:{},e:{},n:{},s:{}};techs=Object.assign(emptyTechs(),s.techs||{});wonderLevels=s.wonderLevels||{p:0,e:0,n:0,s:0};wonderChosen=s.wonderChosen||{p:0,e:0,n:0,s:0};wonderBuffs=s.wonderBuffs||{p:{military:0,economy:0},e:{military:0,economy:0},n:{military:0,economy:0},s:{military:0,economy:0}};teamRaces=s.teamRaces||teamRaces;rallyPoints=s.rallyPoints||{p:null,e:null,n:null,s:null};if(s.selectedRace)selectedRace=s.selectedRace;return true}catch(e){console.error(e);return false}}
 document.getElementById('loadBtn').onclick=()=>{if(!localStorage.getItem('frontier_save_v2')&&!localStorage.getItem('frontier_save')){alert('目前沒有可載入的存檔');return}if(load()){started=true;paused=false;gameOver=false;document.getElementById('overlay').style.display='none';updateUI();log('已載入存檔（時間 '+fmt(elapsed)+'）')}else alert('存檔損壞或格式不符')};
 requestAnimationFrame(frame);
 })();
