@@ -96,7 +96,7 @@ nomads:[
 function emptyTechs(){var t={};Object.keys(techDefs).forEach(race=>techDefs[race].forEach(td=>t[td.id]=false));t.weapons=false;t.armor=false;t.engines=false;return t}
 
 var teamPrograms={p:0,e:0,n:0,s:0};
-var teamUnitLevels={p:{},e:{},n:{},s:{}},resources={food:600,wood:450,gold:250},enemyResources={food:600,wood:450,gold:250},countryResources={p:resources,e:{food:600,wood:450,gold:250},n:{food:600,wood:450,gold:250},s:{food:600,wood:450,gold:250}},rallyPoints={p:null,e:null,n:null,s:null},techs=emptyTechs(),eras={p:0,e:0,n:0,s:0},wonderLevels={p:0,e:0,n:0,s:0},wonderChosen={p:0,e:0,n:0,s:0},wonderBuffs={p:{military:0,economy:0},e:{military:0,economy:0},n:{military:0,economy:0},s:{military:0,economy:0}},aiWaveTimers={e:0,n:0,s:0},aiWaveCounts={e:1,n:1,s:1},aiMind={e:{raid:0,posture:'balanced'},n:{raid:0,posture:'balanced'},s:{raid:0,posture:'balanced'}},aiIntel={coalition:false,leader:null,power:{}},eraNames=['石器時代','封建時代','帝國時代','科技時代'],popCap=30,units=[],buildings=[],nodes=[],bullets=[],effects=[],nextId=1,elapsed=0,aiTimer=0,spawnTimer=0,enemyWaveTimer=0,enemyWaveCount=1;
+var teamUnitLevels={p:{},e:{},n:{},s:{}},resources={food:600,wood:450,gold:250},enemyResources={food:600,wood:450,gold:250},countryResources={p:resources,e:{food:600,wood:450,gold:250},n:{food:600,wood:450,gold:250},s:{food:600,wood:450,gold:250}},rallyPoints={p:null,e:null,n:null,s:null},techs=emptyTechs(),eras={p:0,e:0,n:0,s:0},wonderLevels={p:0,e:0,n:0,s:0},wonderChosen={p:0,e:0,n:0,s:0},wonderBuffs={p:{military:0,economy:0},e:{military:0,economy:0},n:{military:0,economy:0},s:{military:0,economy:0}},aiWaveTimers={e:0,n:0,s:0},aiWaveCounts={e:1,n:1,s:1},aiMind={e:{raid:0,posture:'balanced'},n:{raid:0,posture:'balanced'},s:{raid:0,posture:'balanced'}},aiIntel={coalition:false,leader:null,power:{},goldmine:{}},eraNames=['石器時代','封建時代','帝國時代','科技時代'],popCap=30,units=[],buildings=[],nodes=[],bullets=[],effects=[],nextId=1,elapsed=0,aiTimer=0,spawnTimer=0,enemyWaveTimer=0,enemyWaveCount=1;
 var ui={food:document.getElementById('food'),wood:document.getElementById('wood'),gold:document.getElementById('gold'),pop:document.getElementById('pop'),era:document.getElementById('era'),selection:document.getElementById('selection'),actions:document.getElementById('actions'),log:document.getElementById('log')};
 var defs={
 worker:{name:'工程平民',cost:{food:50},time:8,hp:55,range:18,damage:4,rate:1.1,speed:65,kind:'worker',pop:1},
@@ -466,7 +466,8 @@ function chooseStrategicTarget(team,ehq,posture){
  var targetTeam;
  if(aiIntel.coalition)targetTeam='p';
  else{
-   rivals.sort((a,b)=>(aiIntel.goldmine[b]||0)-(aiIntel.goldmine[a]||0));
+   var strategicGold=(aiIntel&&aiIntel.goldmine&&typeof aiIntel.goldmine==='object')?aiIntel.goldmine:{};
+   rivals.sort((a,b)=>(strategicGold[b]||0)-(strategicGold[a]||0));
    targetTeam=rivals[0];
  }
  var targets=buildings.filter(b=>b.team===targetTeam&&b.hp>0);
