@@ -36,6 +36,29 @@ button.primary{background:#785a27;border-color:#c99b45;color:#fff}button.danger{
 "use strict";
 var canvas=document.getElementById('game'),ctx=canvas.getContext('2d'),stage=document.getElementById('stage');
 var mini=document.getElementById('minimap'),mctx=mini.getContext('2d');
+/* 防止任何繪圖分支把負數半徑傳給 Canvas；記錄第一次異常呼叫位置。 */
+(function guardCanvasRadii(c,label){
+ var reported={arc:false,ellipse:false};
+ ['arc','ellipse'].forEach(function(method){
+  var native=c[method].bind(c);
+  c[method]=function(){
+   var args=Array.prototype.slice.call(arguments),indices=method==='arc'?[2]:[2,3],bad=[];
+   indices.forEach(function(i){
+    var value=args[i];
+    if(!Number.isFinite(value)||value<0){
+     bad.push({argument:i,value:value});
+     args[i]=Number.isFinite(value)?Math.max(0,value):0;
+    }
+   });
+   if(bad.length&&!reported[method]){
+    reported[method]=true;
+    console.warn('[RTS] 已攔截無效 Canvas '+method+' 半徑',bad,new Error('radius call site').stack);
+   }
+   return native.apply(null,args);
+  };
+ });
+})(ctx,'main');
+
 /* ========== Grok Improved Edition ==========
    Based on jasonchangandsrarhchen/game
    Changes: minimap, better save/load, clearer structure, UX polish
@@ -650,6 +673,8 @@ if(!alive.includes('p')||alive.length<=1){gameOver=true;paused=true;document.get
 if(!tick.uiTimer)tick.uiTimer=0;tick.uiTimer+=dt;if(tick.uiTimer>=0.5){tick.uiTimer=0;updateUI();}
 }
 function draw(){
+/* 每幀先恢復基礎座標，避免前一幀繪圖例外留下的 transform 污染後續畫面。 */
+ctx.setTransform(1,0,0,1,0,0);
 var r=stage.getBoundingClientRect();ctx.clearRect(0,0,r.width,r.height);ctx.save();ctx.translate(ox,oy);ctx.scale(scale,scale);
 
 /* ===== Terrain (richer base + subtle regional tint) ===== */
@@ -963,7 +988,7 @@ if(mctx){
 }
 }
 var mouse={x:700,y:500};canvas.addEventListener('mousemove',e=>{var p=screenToWorld(e.clientX,e.clientY);mouse=p});
-function frame(t){var dt=Math.min(.05,(t-last)/1000||0);last=t;try{if(!paused&&!gameOver){acc+=dt*speed;var steps=0;while(acc>=.05&&steps<8&&!paused&&!gameOver){try{tick(.05)}catch(err){paused=true;acc=0;console.error('RTS tick error:',err);log('遊戲已安全暫停：'+(err&&err.message?err.message:String(err))+'。請回報此訊息。');document.getElementById('pauseTag').style.display='block';document.getElementById('pause').textContent='▶ 繼續';break}acc-=.05;steps++}}try{draw()}catch(err){paused=true;console.error('RTS draw error:',err);log('畫面繪製錯誤：'+(err&&err.message?err.message:String(err))+'。請回報此訊息。');} }catch(err){paused=true;console.error('RTS frame error:',err);log('遊戲主迴圈錯誤：'+(err&&err.message?err.message:String(err))+'。');}requestAnimationFrame(frame)}
+function frame(t){var dt=Math.min(.05,(t-last)/1000||0);last=t;try{if(!paused&&!gameOver){acc+=dt*speed;var steps=0;while(acc>=.05&&steps<8&&!paused&&!gameOver){try{tick(.05)}catch(err){paused=true;acc=0;console.error('RTS tick error:',err);log('遊戲已安全暫停：'+(err&&err.message?err.message:String(err))+'。請回報此訊息。');document.getElementById('pauseTag').style.display='block';document.getElementById('pause').textContent='▶ 繼續';break}acc-=.05;steps++}}try{draw()}catch(err){paused=true;console.error('RTS draw error:',err);try{if(typeof ctx.reset==='function')ctx.reset();else ctx.setTransform(1,0,0,1,0,0)}catch(resetErr){console.error('Canvas recovery failed:',resetErr)}log('畫面繪製錯誤：'+(err&&err.message?err.message:String(err))+'。已重置畫布狀態，請回報此訊息。');} }catch(err){paused=true;console.error('RTS frame error:',err);log('遊戲主迴圈錯誤：'+(err&&err.message?err.message:String(err))+'。');}requestAnimationFrame(frame)}
 var racePicker=document.createElement('div');racePicker.id='racePicker';racePicker.style.cssText='display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px;margin:16px 0';
 Object.keys(raceDefs).forEach(key=>{var r=raceDefs[key],card=document.createElement('button');card.type='button';card.style.cssText='text-align:left;white-space:normal;padding:12px;border:2px solid '+(key===selectedRace?'#f4cf70':'#536477')+';background:'+(key===selectedRace?'#344a5a':'#202e3b')+';color:#fff;border-radius:10px';card.innerHTML='<b>'+r.name+'</b><div style="font-size:12px;margin:6px 0;color:#f4cf70">'+r.bonus+'</div><div style="font-size:12px">專屬兵種：'+r.unitName+' — '+r.unitDesc+'</div>';card.onclick=()=>{selectedRace=key;racePicker.querySelectorAll('button').forEach(el=>el.style.borderColor='#536477');card.style.borderColor='#f4cf70'};racePicker.appendChild(card)});
 document.querySelector('#overlay .modal').insertBefore(racePicker,document.getElementById('start'));
