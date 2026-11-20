@@ -956,14 +956,14 @@ ctx.restore();
 if(mctx){
   var mw=mini.width,mh=mini.height,sx=mw/W,sy=mh/H;
   mctx.fillStyle='#0a1218';mctx.fillRect(0,0,mw,mh);
-  nodes.forEach(n=>{if(n.amount<=0)return;mctx.fillStyle=n.type==='wood'?'#3a7a4a':n.type==='ore'?'#7a7a8a':'#6a5a3a';mctx.fillRect(n.x*sx-1.5,n.y*sy-1.5,3,3)});
-  buildings.forEach(b=>{if(b.hp<=0)return;mctx.fillStyle={p:'#68c5e4',e:'#ec7568',n:'#b99be8',s:'#f0c45c'}[b.team]||'#aaa';var s=b.type==='hq'?5:b.type==='wonder'?4:3;mctx.fillRect(b.x*sx-s/2,b.y*sy-s/2,s,s)});
-  units.forEach(u=>{if(u.hp<=0)return;mctx.fillStyle={p:'#68c5e4',e:'#ec7568',n:'#b99be8',s:'#f0c45c'}[u.team]||'#ccc';mctx.fillRect(u.x*sx-1,u.y*sy-1,2,2)});
+  nodes.forEach(n=>{if(n.amount<=0||!fogWasSeen(n.x,n.y))return;mctx.fillStyle=n.type==='wood'?'#3a7a4a':n.type==='ore'?'#7a7a8a':'#6a5a3a';mctx.fillRect(n.x*sx-1.5,n.y*sy-1.5,3,3)});
+  buildings.forEach(b=>{if(b.hp<=0||(b.team!=='p'&&!fogWasSeen(b.x,b.y)))return;mctx.fillStyle={p:'#68c5e4',e:'#ec7568',n:'#b99be8',s:'#f0c45c'}[b.team]||'#aaa';var s=b.type==='hq'?5:b.type==='wonder'?4:3;mctx.fillRect(b.x*sx-s/2,b.y*sy-s/2,s,s)});
+  units.forEach(u=>{if(u.hp<=0||(u.team!=='p'&&!fogCanSee(u.x,u.y)))return;mctx.fillStyle={p:'#68c5e4',e:'#ec7568',n:'#b99be8',s:'#f0c45c'}[u.team]||'#ccc';mctx.fillRect(u.x*sx-1,u.y*sy-1,2,2)});
   mctx.strokeStyle='#536b71';mctx.lineWidth=1;mctx.strokeRect(0.5,0.5,mw-1,mh-1);
 }
 }
 var mouse={x:700,y:500};canvas.addEventListener('mousemove',e=>{var p=screenToWorld(e.clientX,e.clientY);mouse=p});
-function frame(t){var dt=Math.min(.05,(t-last)/1000||0);last=t;if(!paused&&!gameOver){acc+=dt*speed;while(acc>=.05){tick(.05);acc-=.05}}draw();requestAnimationFrame(frame)}
+function frame(t){var dt=Math.min(.05,(t-last)/1000||0);last=t;try{if(!paused&&!gameOver){acc+=dt*speed;var steps=0;while(acc>=.05&&steps<8&&!paused&&!gameOver){try{tick(.05)}catch(err){paused=true;acc=0;console.error('RTS tick error:',err);log('遊戲已安全暫停：'+(err&&err.message?err.message:String(err))+'。請回報此訊息。');document.getElementById('pauseTag').style.display='block';document.getElementById('pause').textContent='▶ 繼續';break}acc-=.05;steps++}}try{draw()}catch(err){paused=true;console.error('RTS draw error:',err);log('畫面繪製錯誤：'+(err&&err.message?err.message:String(err))+'。請回報此訊息。');} }catch(err){paused=true;console.error('RTS frame error:',err);log('遊戲主迴圈錯誤：'+(err&&err.message?err.message:String(err))+'。');}requestAnimationFrame(frame)}
 var racePicker=document.createElement('div');racePicker.id='racePicker';racePicker.style.cssText='display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px;margin:16px 0';
 Object.keys(raceDefs).forEach(key=>{var r=raceDefs[key],card=document.createElement('button');card.type='button';card.style.cssText='text-align:left;white-space:normal;padding:12px;border:2px solid '+(key===selectedRace?'#f4cf70':'#536477')+';background:'+(key===selectedRace?'#344a5a':'#202e3b')+';color:#fff;border-radius:10px';card.innerHTML='<b>'+r.name+'</b><div style="font-size:12px;margin:6px 0;color:#f4cf70">'+r.bonus+'</div><div style="font-size:12px">專屬兵種：'+r.unitName+' — '+r.unitDesc+'</div>';card.onclick=()=>{selectedRace=key;racePicker.querySelectorAll('button').forEach(el=>el.style.borderColor='#536477');card.style.borderColor='#f4cf70'};racePicker.appendChild(card)});
 document.querySelector('#overlay .modal').insertBefore(racePicker,document.getElementById('start'));
