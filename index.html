@@ -442,11 +442,11 @@ function refreshStrategicIntel(){
  var power={};alive.forEach(t=>power[t]=teamPowerScore(t));
  var leader=alive.slice().sort((a,b)=>power[b]-power[a])[0]||null;
  var rivals=alive.filter(t=>t!=='p'),avg=rivals.length?rivals.reduce((v,t)=>v+power[t],0)/rivals.length:0;
- aiIntel={power:power,leader:leader,coalition:leader==='p'&&rivals.length>=2&&power.p>avg*1.28&&rivals.every(t=>power.p>power[t]*1.12)};
+ aiIntel={power:power,goldmine:(aiIntel&&aiIntel.goldmine)||{},leader:leader,coalition:leader==='p'&&rivals.length>=2&&power.p>avg*1.28&&rivals.every(t=>power.p>(power[t]||0)*1.12)};
 }
 function assessAI(team){
  var mind=aiMind[team],wallet=countryResources[team]||{food:0,wood:0,gold:0};
- var intelPower=aiIntel.power||(aiIntel.power={}),own=intelPower[team]||teamPowerScore(team),enemyMax=0;
+ var intelPower=(typeof aiIntel==='object'&&aiIntel&&typeof aiIntel.power==='object'&&aiIntel.power)?aiIntel.power:{},own=intelPower[team]||teamPowerScore(team),enemyMax=0;
  ['p','e','n','s'].filter(t=>t!==team).forEach(t=>enemyMax=Math.max(enemyMax,intelPower[t]||0));
  var ownArmy=units.filter(u=>u.team===team&&u.hp>0&&!['worker','medic'].includes(u.type));
  var hq=buildings.find(b=>b.team===team&&b.type==='hq');
