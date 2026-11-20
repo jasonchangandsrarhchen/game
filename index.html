@@ -1003,7 +1003,22 @@ document.getElementById('pause').onclick=()=>{if(!started||gameOver)return;pause
 document.getElementById('speed').onclick=()=>{speed=speed===1?2:speed===2?3:1;document.getElementById('speed').textContent='速度 ×'+speed};
 document.getElementById('reset').onclick=()=>{if(confirm('重新開始並重新選擇文明？')){paused=true;started=false;gameOver=false;document.getElementById('overlay').style.display='flex';document.getElementById('pause').textContent='Ⅱ 暫停';document.getElementById('pauseTag').style.display='none'}};
 document.getElementById('save').onclick=()=>{try{localStorage.setItem('frontier_save_v2',JSON.stringify({version:2,teamUnitLevels:teamUnitLevels,resources:resources,countryResources:countryResources,units:units,buildings:buildings,nodes:nodes,elapsed:elapsed,nextId:nextId,eras:eras,techs:techs,wonderLevels:wonderLevels,wonderChosen:wonderChosen,wonderBuffs:wonderBuffs,teamRaces:teamRaces,rallyPoints:rallyPoints,selectedRace:selectedRace}));log('遊戲進度已儲存（完整四國狀態）')}catch(e){log('儲存失敗：'+e.message)}};
-function load(){try{var raw=localStorage.getItem('frontier_save_v2')||localStorage.getItem('frontier_save');if(!raw)return false;var s=JSON.parse(raw);if(!s)return false;resources=s.resources||{food:600,wood:450,gold:250};countryResources=s.countryResources||{p:resources,e:{food:600,wood:450,gold:250},n:{food:600,wood:450,gold:250},s:{food:600,wood:450,gold:250}};if(s.countryResources)countryResources.p=resources;units=s.units||[];buildings=s.buildings||[];nodes=s.nodes||[];elapsed=s.elapsed||0;nextId=s.nextId||1;eras=s.eras||{p:0,e:0,n:0,s:0};teamUnitLevels=s.teamUnitLevels||{p:{},e:{},n:{},s:{}};techs=Object.assign(emptyTechs(),s.techs||{});wonderLevels=s.wonderLevels||{p:0,e:0,n:0,s:0};wonderChosen=s.wonderChosen||{p:0,e:0,n:0,s:0};wonderBuffs=s.wonderBuffs||{p:{military:0,economy:0},e:{military:0,economy:0},n:{military:0,economy:0},s:{military:0,economy:0}};teamRaces=s.teamRaces||teamRaces;rallyPoints=s.rallyPoints||{p:null,e:null,n:null,s:null};if(s.selectedRace)selectedRace=s.selectedRace;return true}catch(e){console.error(e);return false}}
+function load(){try{
+ var raw=localStorage.getItem('frontier_save_v2')||localStorage.getItem('frontier_save');if(!raw)return false;var s=JSON.parse(raw);if(!s)return false;
+ var legacy=!!(s.resources&&s.resources.food===undefined);
+ function migrateWallet(w){if(!w)return{food:600,wood:450,gold:250};if(w.food!==undefined||w.gold!==undefined)return{food:w.food||0,wood:w.wood||0,gold:w.gold||0};return{food:w.wood||0,wood:w.ore||0,gold:w.oil||0}}
+ resources=migrateWallet(s.resources);
+ countryResources={p:resources,e:migrateWallet(s.countryResources&&s.countryResources.e),n:migrateWallet(s.countryResources&&s.countryResources.n),s:migrateWallet(s.countryResources&&s.countryResources.s)};
+ units=s.units||[];buildings=s.buildings||[];nodes=s.nodes||[];
+ if(legacy){
+  var mapResource=function(t){return t==='wood'?'food':t==='ore'?'wood':t==='oil'?'gold':t};
+  var mapBuilding=function(t){return t==='lumber'?'meatFarm':t==='mine'?'woodshop':t==='power'?'goldmine':t};
+  nodes.forEach(n=>{n.type=mapResource(n.type)});
+  units.forEach(u=>{if(u.resource)u.resource=mapResource(u.resource);if(u.order&&u.order.node)u.order.node.type=mapResource(u.order.node.type)});
+  buildings.forEach(b=>{b.type=mapBuilding(b.type);if(b.rallyOrder&&b.rallyOrder.node)b.rallyOrder.node.type=mapResource(b.rallyOrder.node.type)});
+ }
+ elapsed=s.elapsed||0;nextId=s.nextId||1;eras=s.eras||{p:0,e:0,n:0,s:0};teamUnitLevels=s.teamUnitLevels||{p:{},e:{},n:{},s:{}};techs=Object.assign(emptyTechs(),s.techs||{});wonderLevels=s.wonderLevels||{p:0,e:0,n:0,s:0};wonderChosen=s.wonderChosen||{p:0,e:0,n:0,s:0};wonderBuffs=s.wonderBuffs||{p:{military:0,economy:0},e:{military:0,economy:0},n:{military:0,economy:0},s:{military:0,economy:0}};teamRaces=s.teamRaces||teamRaces;rallyPoints=s.rallyPoints||{p:null,e:null,n:null,s:null};if(s.selectedRace)selectedRace=s.selectedRace;return true
+ }catch(e){console.error(e);return false}}
 document.getElementById('loadBtn').onclick=()=>{if(!localStorage.getItem('frontier_save_v2')&&!localStorage.getItem('frontier_save')){alert('目前沒有可載入的存檔');return}if(load()){started=true;paused=false;gameOver=false;document.getElementById('overlay').style.display='none';updateUI();log('已載入存檔（時間 '+fmt(elapsed)+'）')}else alert('存檔損壞或格式不符')};
 requestAnimationFrame(frame);
 })();
