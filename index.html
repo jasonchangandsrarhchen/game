@@ -290,7 +290,7 @@ if(o.team==='p'){
   if(techs.sandstorm&&o.type==='raider')sp*=1.10;
 }var step=Math.min(d,sp*dt),nx=o.x+dx/d*step,ny=o.y+dy/d*step;o.moving=true;o.walkPhase=(o.walkPhase||0)+dt*11;o.facing=Math.atan2(dy,dx);var wall=buildings.find(b=>b.type==='wall'&&b.team!==o.team&&b.hp>0&&(()=>{var a=-(b.angle||0),rx=(nx-b.x)*Math.cos(a)-(ny-b.y)*Math.sin(a),ry=(nx-b.x)*Math.sin(a)+(ny-b.y)*Math.cos(a);return Math.abs(rx)<buildingDefs.wall.w/2+9&&Math.abs(ry)<buildingDefs.wall.h/2+9})());if(wall){o.blockedBy=wall.id;return}o.x=nx;o.y=ny}else{o.moving=false}}
 function findById(id){return units.concat(buildings).find(o=>o.id===id)}
-function shoot(a,t,d,dt){if(!t||t.hp<=0)return;var dd=dist(a,t),range=a.attackRange||d.range;if(dd>range){moveTo(a,t.x,t.y,dt);return}a.facing=Math.atan2(t.y-a.y,t.x-a.x);a.cool-=dt;if(a.cool<=0){a.cool=a.attackRate||d.rate;a.fireAnim=.24;var race=raceDefs[teamRaces[a.team]||'engineers'],mult=(['rifle','rocket','warden','breaker','marksman'].includes(a.type)?(race.attack||1):1)*(a.type==='tank'||a.type==='heavy'||a.type==='raider'?(teamRaces[a.team]==='ironclad'?1.1:1):1);var muzzle=a.type==='marksman'?20:a.type==='rocket'?17:a.type==='artillery'?22:15;bullets.push({x:a.x+Math.cos(a.facing)*muzzle,y:a.y+Math.sin(a.facing)*muzzle,tx:t.x,ty:t.y,team:a.team,source:a.id,damage:(a.attackDamage||d.damage)*mult,speed:a.type==='marksman'?430:340,type:a.type})}}
+function shoot(a,t,d,dt){if(!t||t.hp<=0)return;var dd=dist(a,t),range=a.attackRange||d.range;if(dd>range){moveTo(a,t.x,t.y,dt);return}a.facing=Math.atan2(t.y-a.y,t.x-a.x);a.cool-=dt;if(a.cool<=0){a.cool=a.attackRate||d.rate;a.fireAnim=.24;var race=raceDefs[teamRaces[a.team]||'engineers'],mult=(['infantry','anti'].includes((d||{}).kind)?(race.attack||1):1)*(teamRaces[a.team]==='ironclad'&&['vehicle','artillery'].includes((d||{}).kind)?1.1:1);var muzzle=a.type==='marksman'?20:a.type==='rocket'?17:a.type==='artillery'?22:15;bullets.push({x:a.x+Math.cos(a.facing)*muzzle,y:a.y+Math.sin(a.facing)*muzzle,tx:t.x,ty:t.y,team:a.team,source:a.id,damage:(a.attackDamage||d.damage)*mult,speed:a.type==='marksman'?430:340,type:a.type})}}
 function callDefenders(threatened,attacker){if(!threatened||!attacker||attacker.kind!=='unit'||attacker.type==='worker'||attacker.type==='medic')return;var side=threatened.team;var hostiles=units.filter(v=>v.team!==side&&v.hp>0&&v.type!=='worker'&&v.type!=='medic'&&dist(v,threatened)<310);if(!hostiles.length)return;hostiles.sort((a,b)=>{var aa=a.id===attacker.id?-1:0,bb=b.id===attacker.id?-1:0;return aa-bb||(a.hp/a.max)-(b.hp/b.max)||a.hp-b.hp||dist(threatened,a)-dist(threatened,b)});var focus=hostiles[0];units.filter(u=>u.team===side&&u.hp>0&&u.type!=='worker'&&u.type!=='medic'&&dist(u,threatened)<245).forEach(u=>{u.order={type:'attack',target:focus.id};u.target=focus.id;});}
 function updateUnit(u,dt){
 u.fireAnim=Math.max(0,(u.fireAnim||0)-dt);u.moving=false;
@@ -497,8 +497,8 @@ function enemyAIFor(team,dt){
  var playerArmy=units.filter(u=>u.team==='p'&&u.hp>0&&!['worker','medic'].includes(u.type));
  var pInf=playerArmy.filter(u=>['infantry','anti'].includes((defs[u.type]||{}).kind)).length;
  var pMelee=playerArmy.filter(u=>(defs[u.type].role||'ranged')==='melee').length;
- var pVeh=playerArmy.filter(u=>['tank','scout','heavy','raider'].includes(u.type)).length;
- var pArt=playerArmy.filter(u=>u.type==='artillery').length;
+ var pVeh=playerArmy.filter(u=>(defs[u.type]||{}).kind==='vehicle').length;
+ var pArt=playerArmy.filter(u=>(defs[u.type]||{}).kind==='artillery').length;
  var pTotal=Math.max(1,playerArmy.length),infantryRush=pInf/pTotal>.58,vehicleRush=pVeh/pTotal>.32,artilleryRush=pArt/pTotal>.22;
  eb.filter(b=>b.type==='barracks').forEach(b=>{
    while(elapsed>35&&pop<cap&&b.queue.length<1){
