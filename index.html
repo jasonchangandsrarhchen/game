@@ -322,8 +322,8 @@ function rangedTactics(u,target,dt){
  if(role!=='ranged'||!['nomads','rangers'].includes(race))return false;
  var range=u.attackRange||defs[u.type].range,distToTarget=dist(u,target);
  var hostiles=units.filter(v=>v.team!==u.team&&v.hp>0&&!['worker','medic'].includes(v.type));
- var meleeThreats=hostiles.filter(v=>((v.combat&&v.combat.role)||defs[v.type]?.role)==='melee'&&dist(u,v)<Math.max(150,range*.72));
- // Prioritize an approaching melee unit over a distant building or ranged target.
+ // Keep nearby melee threats in view long enough to prevent frame-by-frame target switching.
+ var meleeThreats=hostiles.filter(v=>((v.combat&&v.combat.role)||defs[v.type]?.role)==='melee'&&dist(u,v)<Math.max(220,range*1.05));
  if(meleeThreats.length){
   meleeThreats.sort((a,b)=>dist(u,a)-dist(u,b));
   if(distToTarget>range*.92||dist(u,meleeThreats[0])<distToTarget)target=meleeThreats[0];
@@ -331,30 +331,31 @@ function rangedTactics(u,target,dt){
  }
  var minGap=race==='nomads'?Math.max(105,range*.57):Math.max(125,range*.68);
  var idealGap=race==='nomads'?range*.78:range*.86;
- var danger=meleeThreats.filter(v=>dist(u,v)<minGap+35);
- if(danger.length||distToTarget<minGap){
-  // Move away from the weighted center of nearby enemies to avoid being surrounded.
+ // Hysteresis: start retreating at minGap, resume advancing only after minGap+70.
+ var nearestMelee=meleeThreats.length?dist(u,meleeThreats[0]):Infinity;
+ if(nearestMelee<minGap)u.kiteRetreat=true;
+ else if(nearestMelee>minGap+70)u.kiteRetreat=false;
+ var shouldFlee=u.kiteRetreat||distToTarget<minGap;
+ if(shouldFlee){
+  var threats=meleeThreats.filter(v=>dist(u,v)<minGap+115);
+  if(!threats.length)threats=hostiles.filter(v=>dist(u,v)<minGap);
   var ax=0,ay=0;
-  var threats=danger.length?danger:hostiles.filter(v=>dist(u,v)<minGap+30);
   threats.forEach(v=>{var dx=u.x-v.x,dy=u.y-v.y,len=Math.max(1,Math.hypot(dx,dy));var weight=1/(len*len);ax+=dx/len*weight;ay+=dy/len*weight;});
   var mag=Math.hypot(ax,ay);
   if(mag<1e-8){ax=u.x-target.x;ay=u.y-target.y;mag=Math.hypot(ax,ay)||1;}
-  var flee= race==='nomads'?Math.max(105,range*.62):Math.max(85,range*.42);
+  var flee=race==='nomads'?Math.max(105,range*.62):Math.max(85,range*.42);
   var tx=Math.max(35,Math.min(W-35,u.x+ax/mag*flee)),ty=Math.max(35,Math.min(H-35,u.y+ay/mag*flee));
   moveTo(u,tx,ty,dt);
   if(distToTarget<=range)shoot(u,target,defs[u.type],dt);
   return true;
  }
  if(distToTarget>idealGap){
-  // Advance only to a firing position, never blindly run into melee range.
   var dx=target.x-u.x,dy=target.y-u.y,len=Math.max(1,Math.hypot(dx,dy));
-  var stop=idealGap;
-  var tx=target.x-dx/len*stop,ty=target.y-dy/len*stop;
+  var tx=target.x-dx/len*idealGap,ty=target.y-dy/len*idealGap;
   moveTo(u,tx,ty,dt);
   if(distToTarget<=range)shoot(u,target,defs[u.type],dt);
   return true;
  }
- // Hold the firing line and use the full range advantage.
  if(distToTarget<=range)shoot(u,target,defs[u.type],dt);
  return true;
 }
