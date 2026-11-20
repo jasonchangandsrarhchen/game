@@ -148,7 +148,7 @@ wonder:{name:'世界奇觀',cost:{food:900,wood:700,gold:350},hp:2400,w:112,h:10
 };
 function log(s){var d=document.createElement('div');d.className='logline';d.textContent='['+fmt(elapsed)+'] '+s;ui.log.prepend(d);while(ui.log.children.length>30)ui.log.lastChild.remove()}
 function fmt(t){return Math.floor(t/60)+':'+('0'+Math.floor(t%60)).slice(-2)}
-function costText(c){return Object.keys(c).map(k=>({food:'肉',wood:'木',gold:'金'}[k])+c[k]).join(' ')}
+function costText(c){return Object.keys(c).map(k=>({food:'肉',wood:'木材',gold:'金礦'}[k]||k)+c[k]).join(' ')}
 function eraName(team){return eraNames[eras[team]||0]}
 function buildingName(type,team){
  var e=eras[team]||0;
@@ -439,10 +439,10 @@ function teamPowerScore(team){
 }
 function refreshStrategicIntel(){
  var alive=['p','e','n','s'].filter(t=>buildings.some(b=>b.team===t&&b.type==='hq')||units.some(u=>u.team===t&&u.type==='worker'));
- var power={};alive.forEach(t=>power[t]=teamPowerScore(t));
+ var power={},goldmine={};alive.forEach(t=>{power[t]=teamPowerScore(t);var wallet=countryResources[t]||{gold:0};var deposits=nodes.filter(n=>n.zone===t&&n.type==='gold'&&n.amount>0).reduce((sum,n)=>sum+n.amount,0);var mines=buildings.filter(b=>b.team===t&&b.type==='goldmine'&&b.hp>0).length;goldmine[t]=(wallet.gold||0)+deposits*.05+mines*120;});
  var leader=alive.slice().sort((a,b)=>power[b]-power[a])[0]||null;
  var rivals=alive.filter(t=>t!=='p'),avg=rivals.length?rivals.reduce((v,t)=>v+power[t],0)/rivals.length:0;
- aiIntel={power:power,goldmine:(aiIntel&&aiIntel.goldmine)||{},leader:leader,coalition:leader==='p'&&rivals.length>=2&&power.p>avg*1.28&&rivals.every(t=>power.p>(power[t]||0)*1.12)};
+ aiIntel={power:power,goldmine:goldmine,leader:leader,coalition:leader==='p'&&rivals.length>=2&&power.p>avg*1.28&&rivals.every(t=>power.p>(power[t]||0)*1.12)};
 }
 function assessAI(team){
  var mind=aiMind[team],wallet=countryResources[team]||{food:0,wood:0,gold:0};
@@ -1006,13 +1006,13 @@ document.getElementById('reset').onclick=()=>{if(confirm('重新開始並重新�
 document.getElementById('save').onclick=()=>{try{localStorage.setItem('frontier_save_v2',JSON.stringify({version:2,teamUnitLevels:teamUnitLevels,resources:resources,countryResources:countryResources,units:units,buildings:buildings,nodes:nodes,elapsed:elapsed,nextId:nextId,eras:eras,techs:techs,wonderLevels:wonderLevels,wonderChosen:wonderChosen,wonderBuffs:wonderBuffs,teamRaces:teamRaces,rallyPoints:rallyPoints,selectedRace:selectedRace}));log('遊戲進度已儲存（完整四國狀態）')}catch(e){log('儲存失敗：'+e.message)}};
 function load(){try{
  var raw=localStorage.getItem('frontier_save_v2')||localStorage.getItem('frontier_save');if(!raw)return false;var s=JSON.parse(raw);if(!s)return false;
- var legacy=!!(s.resources&&s.resources.food===undefined);
- function migrateWallet(w){if(!w)return{food:600,wood:450,gold:250};if(w.food!==undefined||w.gold!==undefined)return{food:w.food||0,wood:w.wood||0,gold:w.gold||0};return{food:w.wood||0,wood:w.ore||0,gold:w.oil||0}}
+ var legacy=!!(s.resources&&(s.resources.food===undefined||s.resources.ore!==undefined||s.resources.oil!==undefined));
+ function migrateWallet(w){if(!w)return{food:600,wood:450,gold:250};var modern=w.food!==undefined||w.gold!==undefined;return{food:w.food!==undefined?w.food:(w.wood||0),wood:w.ore!==undefined?w.ore:(modern?(w.wood||0):0),gold:w.gold!==undefined?w.gold:(w.oil||0)}}
  resources=migrateWallet(s.resources);
  countryResources={p:resources,e:migrateWallet(s.countryResources&&s.countryResources.e),n:migrateWallet(s.countryResources&&s.countryResources.n),s:migrateWallet(s.countryResources&&s.countryResources.s)};
  units=s.units||[];buildings=s.buildings||[];nodes=s.nodes||[];
  if(legacy){
-  var mapResource=function(t){return t==='wood'?'food':t==='ore'?'wood':t==='oil'?'gold':t};
+  var mapResource=function(t){return legacy&&t==='wood'?'food':t==='ore'?'wood':t==='oil'?'gold':t};
   var mapBuilding=function(t){return t==='lumber'?'meatFarm':t==='mine'?'woodshop':t==='power'?'goldmine':t};
   nodes.forEach(n=>{n.type=mapResource(n.type)});
   units.forEach(u=>{if(u.resource)u.resource=mapResource(u.resource);if(u.order&&u.order.node)u.order.node.type=mapResource(u.order.node.type)});
