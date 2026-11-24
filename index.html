@@ -457,17 +457,6 @@ if(u.team!=='p'){
 }
 if(t&&t.hp>0){if(u.team!=='p'&&rangedTactics(u,t,dt)){}else shoot(u,t,d,dt);}else if(u.order&&u.order.type==='attack')u.order=null;
 }
-function updateNeutralSites(dt){
- var teams=['p','e','n','s'];
- neutralSites.forEach(site=>{
-  var present=teams.map(t=>({team:t,count:units.filter(u=>u.team===t&&u.hp>0&&dist(u,site)<112).length})).filter(v=>v.count>0);
-  if(present.length===1){var c=present[0];if(c.team!==site.owner){if(site.captureTeam!==c.team){site.captureTeam=c.team;site.captureProgress=0}site.captureProgress+=dt*(2.2+Math.min(6,c.count)*.7);if(site.captureProgress>=100){site.owner=c.team;site.captureTeam=null;site.captureProgress=0;log((({p:'藍方',e:'紅方',n:'紫方',s:'金方'})[c.team]||c.team)+' 佔領了 '+site.name+'！');if(c.team==='p')updateUI()}}else{site.captureTeam=null;site.captureProgress=0}}
-  else if(present.length>1){site.captureProgress=Math.max(0,site.captureProgress-dt*1.4);if(site.captureProgress===0)site.captureTeam=null}
-  else{site.captureProgress=Math.max(0,site.captureProgress-dt*.35);if(site.captureProgress===0)site.captureTeam=null}
-  if(site.owner&&site.type==='supply'){var wallet=countryResources[site.owner];if(wallet){wallet.food+=.28*dt;wallet.wood+=.22*dt;wallet.gold+=.16*dt}}
-  if(site.owner&&site.queue&&site.queue.length){var q=site.queue[0];q.remain-=dt;if(q.remain<=0){var born=makeUnit(site.owner,q.type,site.x+(Math.random()-.5)*35,site.y+35+(Math.random()-.5)*25);site.queue.shift();if(site.owner==='p'){log('傭兵營地完成招募：'+defs[q.type].name);updateUI()}}}
- });
-}
 
 function updateBuilding(b,dt){
 if(b.team==='p'&&b.repeatType&&b.queue.length===0)startRepeatProduction(b);
@@ -730,7 +719,15 @@ function projectileHitsWall(x1,y1,x2,y2,w){
 function tick(dt){
 elapsed+=dt;enemyAI(dt);updateFog(dt);
 units.slice().forEach(u=>{if(u.hp>0)updateUnit(u,dt)});
-buildings.slice().forEach(b=>{if(b.hp>0)updateBuilding(b,dt)});updateNeutralSites(dt);
+buildings.slice().forEach(b=>{if(b.hp>0)updateBuilding(b,dt)});var teams=['p','e','n','s'];
+ neutralSites.forEach(site=>{
+  var present=teams.map(t=>({team:t,count:units.filter(u=>u.team===t&&u.hp>0&&dist(u,site)<112).length})).filter(v=>v.count>0);
+  if(present.length===1){var c=present[0];if(c.team!==site.owner){if(site.captureTeam!==c.team){site.captureTeam=c.team;site.captureProgress=0}site.captureProgress+=dt*(2.2+Math.min(6,c.count)*.7);if(site.captureProgress>=100){site.owner=c.team;site.captureTeam=null;site.captureProgress=0;log((({p:'藍方',e:'紅方',n:'紫方',s:'金方'})[c.team]||c.team)+' 佔領了 '+site.name+'！');if(c.team==='p')updateUI()}}else{site.captureTeam=null;site.captureProgress=0}}
+  else if(present.length>1){site.captureProgress=Math.max(0,site.captureProgress-dt*1.4);if(site.captureProgress===0)site.captureTeam=null}
+  else{site.captureProgress=Math.max(0,site.captureProgress-dt*.35);if(site.captureProgress===0)site.captureTeam=null}
+  if(site.owner&&site.type==='supply'){var wallet=countryResources[site.owner];if(wallet){wallet.food+=.28*dt;wallet.wood+=.22*dt;wallet.gold+=.16*dt}}
+  if(site.owner&&site.queue&&site.queue.length){var q=site.queue[0];q.remain-=dt;if(q.remain<=0){var born=makeUnit(site.owner,q.type,site.x+(Math.random()-.5)*35,site.y+35+(Math.random()-.5)*25);site.queue.shift();if(site.owner==='p'){log('傭兵營地完成招募：'+defs[q.type].name);updateUI()}}}
+ });
 function applyProjectileDamage(b,target,x,y){
  var attacker=findById(b.source),damage=b.damage*(1+(wonderBuffs[b.team]?wonderBuffs[b.team].military*.15:0));
  if(b.team==='p'){if(techs.precise_shot&&['rifle','rocket','marksman','warden','breaker'].includes(b.type))damage*=1.18;if(techs.armor_pierce&&['marksman','rocket'].includes(b.type))damage*=1.25;if(techs.vehicle_up&&['tank','artillery','scout','heavy','raider'].includes(b.type))damage*=1.20;if(techs.sandstorm&&b.type==='raider')damage*=1.25;if(techs.mech_sync&&b.type==='warden')damage*=1.20;if(techs.weapons)damage*=1.15;}
