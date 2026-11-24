@@ -457,7 +457,6 @@ if(u.team!=='p'){
 }
 if(t&&t.hp>0){if(u.team!=='p'&&rangedTactics(u,t,dt)){}else shoot(u,t,d,dt);}else if(u.order&&u.order.type==='attack')u.order=null;
 }
-function updateBuilding(b,dt){
 function updateNeutralSites(dt){
  var teams=['p','e','n','s'];
  neutralSites.forEach(site=>{
@@ -470,6 +469,7 @@ function updateNeutralSites(dt){
  });
 }
 
+function updateBuilding(b,dt){
 if(b.team==='p'&&b.repeatType&&b.queue.length===0)startRepeatProduction(b);
 if(b.unitUpgrade){b.unitUpgrade.remain-=dt;if(b.unitUpgrade.remain<=0){var job=b.unitUpgrade;finishUnitUpgrade(b.team,job.type,job.level);b.unitUpgrade=null;if(b.team==='p')updateUI()}}
 if(b.queue&&b.queue.length){var q=b.queue[0];q.remain-=dt;if(q.remain<=0){var d=buildingDefs[b.type],rally=b.rallyOrder||rallyPoints[b.team]||{x:b.x,y:b.y};var born=makeUnit(b.team,q.type,rally.x+(Math.random()-.5)*35,rally.y+35+(Math.random()-.5)*25);if(b.rallyOrder){var ro=b.rallyOrder;if(ro.type==='attack'&&findById(ro.target))born.order={type:'attack',target:ro.target};else if(ro.type==='gather'&&ro.node&&ro.node.amount>0){born.order={type:'gather',node:ro.node};born.resource=ro.node.type}else if(ro.type==='move')born.order={type:'move',x:ro.x,y:ro.y};}b.queue.shift();if(b.team==='p'){log('部隊完成：'+unitName(q.type,b.team));if(b.repeatType&&b.queue.length===0)startRepeatProduction(b);updateUI()}}}
