@@ -211,7 +211,7 @@ function countPop(team){return units.filter(u=>u.team===team).reduce((a,u)=>a+de
 function teamPopCap(team){return 30+buildings.filter(b=>b.team===team&&b.type==='hq').length*10+buildings.filter(b=>b.team===team&&b.type==='fort').length*5+buildings.filter(b=>b.team===team&&b.type==='house').length*20}
 function myCap(){return teamPopCap('p')}
 function updateUI(){
-selected=selected.filter(o=>o&&Number(o.hp)>0);ui.food.textContent=Math.floor(resources.food);ui.wood.textContent=Math.floor(resources.wood);ui.gold.textContent=Math.floor(resources.gold);ui.pop.textContent=countPop('p')+'/'+myCap();ui.era.textContent=eraName('p');
+selected=selected.filter(o=>o&&(o.kind==='neutralSite'||Number(o.hp)>0));ui.food.textContent=Math.floor(resources.food);ui.wood.textContent=Math.floor(resources.wood);ui.gold.textContent=Math.floor(resources.gold);ui.pop.textContent=countPop('p')+'/'+myCap();ui.era.textContent=eraName('p');
 try{renderActions();renderSelection()}catch(err){console.error('UI render error',err);ui.selection.textContent='介面更新錯誤：'+(err&&err.message?err.message:'未知錯誤');ui.actions.replaceChildren()}
 }
 var buildHotkeys={house:'H',wall:'T',barracks:'1',factory:'2',meatFarm:'3',woodshop:'4',goldmine:'5',turret:'6',fort:'7',lab:'8',bunker:'9',depot:'0',cannon:'Q',missile:'W',wonder:'E'};
