@@ -302,6 +302,8 @@ function renderSelection(){
   controls.append(keepWorkers,keepCombat);ui.selection.appendChild(controls);addFormationControls(ui.selection,combat.filter(u=>u.kind==='unit'&&u.team==='p'));return;
  }
  var o=selected[0];if(!o||typeof o!=='object'){selected=[];ui.selection.textContent='尚未選取單位。';return}
+ if(o.kind==='neutralSite'){var siteTitle=document.createElement('b');siteTitle.textContent=o.name;var siteDetail=document.createElement('div');siteDetail.className='muted';var owner=({p:'藍方（你）',e:'紅方 AI',n:'紫方 AI',s:'金方 AI'})[o.owner]||'中立';siteDetail.textContent='控制權：'+owner+'｜'+(o.type==='supply'?'每秒增加肉 0.28、木材 0.22、金礦 0.16':o.type==='arsenal'?'己方新生部隊攻擊力 +10%':o.type==='sanctuary'?'己方新生部隊生命值 +10%':'解鎖自由傭兵招募');if(o.captureTeam)siteDetail.textContent+='｜佔領進度 '+Math.floor(o.captureProgress)+'%';ui.selection.replaceChildren(siteTitle,siteDetail);return}
+
  var isUnit=o.kind==='unit'||!!defs[o.type],def=isUnit?defs[o.type]:buildingDefs[o.type];if(!def){ui.selection.textContent='選取目標資料異常，請重新選取。';return}
  var hp=Math.max(0,Math.ceil(Number(o.hp)||0))+'/'+(Number(o.max)||def.hp),title=document.createElement('b');title.textContent=isUnit?unitName(o.type,o.team):buildingName(o.type,o.team);
  var detail=document.createElement('div');detail.className='muted';var info='耐久 '+hp;
@@ -550,7 +552,7 @@ function enemyAIFor(team,dt){
  var workers=units.filter(u=>u.team===team&&u.type==='worker'&&u.hp>0);
  // 落後勢力可獲得有限的緊急徵用物資；只補資源、不生成免費單位，且有庫存上限。
  mind.supply=(mind.supply||0)+dt;
- var lowStock=(enemyResources.food<90?1:0)+(enemyResources.wood<65?1:0)+(enemyResources.gold<35?1:0)>=2;
+ var lowStock=workers.length?((enemyResources.food<90?1:0)+(enemyResources.wood<65?1:0)+(enemyResources.gold<35?1:0)>=2):enemyResources.food<100;
  if((mind.posture==='behind'||mind.posture==='desperate')&&lowStock&&(workers.length||ehq)&&mind.supply>=(workers.length?60:35)){
    mind.supply=0;
    if(workers.length){enemyResources.food=Math.min(180,enemyResources.food+35);enemyResources.wood=Math.min(120,enemyResources.wood+20);enemyResources.gold=Math.min(70,enemyResources.gold+10)}
@@ -786,6 +788,9 @@ ctx.fillStyle='rgba(90,100,60,.15)';ctx.fillRect(W/2-8,0,16,H);
 nodes.filter(n=>fogWasSeen(n.x,n.y)).forEach(n=>{ctx.save();ctx.translate(n.x,n.y);if(n.type==='food'){ctx.fillStyle='#a88a54';ctx.beginPath();ctx.ellipse(0,2,19,12,0,0,7);ctx.fill();ctx.fillStyle='#c8aa70';ctx.beginPath();ctx.ellipse(9,-7,9,8,0,0,7);ctx.fill();ctx.fillStyle='#7a5935';ctx.beginPath();ctx.moveTo(12,-13);ctx.lineTo(7,-23);ctx.lineTo(16,-17);ctx.lineTo(21,-23);ctx.lineTo(20,-12);ctx.fill();ctx.fillStyle='#302820';ctx.beginPath();ctx.arc(12,-8,1.8,0,7);ctx.fill();ctx.fillStyle='#6c4a2c';ctx.fillRect(-15,8,5,9);ctx.fillRect(7,8,5,9)}else if(n.type==='wood'){ctx.fillStyle='#1a3a28';ctx.beginPath();ctx.arc(0,2,20,0,7);ctx.fill();ctx.fillStyle='#2d6a42';ctx.beginPath();ctx.arc(-6,-6,14,0,7);ctx.fill();ctx.fillStyle='#3d8a55';ctx.beginPath();ctx.arc(5,-10,12,0,7);ctx.fill();ctx.fillStyle='#5a3a22';ctx.fillRect(-3.5,4,7,16)}else{ctx.fillStyle='#4a5058';ctx.beginPath();ctx.moveTo(-18,12);ctx.lineTo(-12,-14);ctx.lineTo(4,-20);ctx.lineTo(20,6);ctx.lineTo(8,16);ctx.closePath();ctx.fill();ctx.fillStyle='#c9a050';ctx.beginPath();ctx.moveTo(-9,4);ctx.lineTo(-3,-10);ctx.lineTo(8,-8);ctx.lineTo(12,8);ctx.closePath();ctx.fill();ctx.fillStyle='#f5d878';ctx.fillRect(-4,-8,7,5);ctx.fillRect(3,0,5,4)}ctx.restore()});
  
 /* ===== Buildings (faction-styled) ===== */
+/* ===== Neutral faction outposts ===== */
+neutralSites.forEach(site=>{if(!fogWasSeen(site.x,site.y))return;ctx.save();ctx.translate(site.x,site.y);var col=site.owner?({p:'#68c5e4',e:'#ec7568',n:'#b99be8',s:'#f0c45c'})[site.owner]:'#c6c8b8';ctx.fillStyle='rgba(10,15,18,.88)';ctx.beginPath();ctx.arc(0,0,35,0,Math.PI*2);ctx.fill();ctx.strokeStyle=col;ctx.lineWidth=4;ctx.beginPath();ctx.arc(0,0,29,0,Math.PI*2);ctx.stroke();ctx.fillStyle=col;ctx.beginPath();ctx.moveTo(0,-20);ctx.lineTo(17,0);ctx.lineTo(0,20);ctx.lineTo(-17,0);ctx.closePath();ctx.fill();ctx.fillStyle='#101820';ctx.font='bold 17px sans-serif';ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText(site.type==='supply'?'＋':site.type==='arsenal'?'⚔':site.type==='sanctuary'?'✚':'★',0,1);ctx.fillStyle='#fff';ctx.font='bold 12px sans-serif';ctx.fillText(site.name,0,49);if(site.captureTeam){ctx.fillStyle='#111';ctx.fillRect(-28,55,56,5);ctx.fillStyle=({p:'#68c5e4',e:'#ec7568',n:'#b99be8',s:'#f0c45c'})[site.captureTeam]||'#fff';ctx.fillRect(-28,55,56*Math.min(1,site.captureProgress/100),5)}ctx.restore()});
+
 function raceKey(team){return teamRaces[team]||'engineers'}
 function factionPalette(team){
   // [base, accent, dark, light]
@@ -1048,6 +1053,7 @@ if(mctx){
   var mw=mini.width,mh=mini.height,sx=mw/W,sy=mh/H;
   mctx.clearRect(0,0,mw,mh);mctx.fillStyle='rgba(10,18,24,.22)';mctx.fillRect(0,0,mw,mh);
   nodes.forEach(n=>{if(n.amount<=0||!fogWasSeen(n.x,n.y))return;mctx.fillStyle=n.type==='food'?'#3a7a4a':n.type==='wood'?'#7a7a8a':'#6a5a3a';mctx.fillRect(n.x*sx-1.5,n.y*sy-1.5,3,3)});
+  neutralSites.forEach(z=>{if(!fogWasSeen(z.x,z.y))return;mctx.fillStyle=z.owner?({p:'#68c5e4',e:'#ec7568',n:'#b99be8',s:'#f0c45c'})[z.owner]:'#e5e2c9';mctx.fillRect(z.x*sx-3,z.y*sy-3,6,6)});
   buildings.forEach(b=>{if(b.hp<=0||(b.team!=='p'&&!fogWasSeen(b.x,b.y)))return;mctx.fillStyle={p:'#68c5e4',e:'#ec7568',n:'#b99be8',s:'#f0c45c'}[b.team]||'#aaa';var s=b.type==='hq'?5:b.type==='wonder'?4:3;mctx.fillRect(b.x*sx-s/2,b.y*sy-s/2,s,s)});
   units.forEach(u=>{if(u.hp<=0||(u.team!=='p'&&!fogCanSee(u.x,u.y)))return;mctx.fillStyle={p:'#68c5e4',e:'#ec7568',n:'#b99be8',s:'#f0c45c'}[u.team]||'#ccc';mctx.fillRect(u.x*sx-1,u.y*sy-1,2,2)});
   mctx.strokeStyle='#536b71';mctx.lineWidth=1;mctx.strokeRect(0.5,0.5,mw-1,mh-1);
