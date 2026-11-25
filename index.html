@@ -340,6 +340,17 @@ function nearestNodeAtDepot(u,type){
 }
 function autoAssignWorkerResource(u){
  if(u.order||u.carry>0)return false;
+ var hasHQ=buildings.some(b=>b.team===u.team&&b.type==='hq'&&b.hp>0);
+ // 主堡失守後，AI 工人進入重建經濟：不再要求附近必須有對應資源建築才能採集。
+ if(u.team!=='p'&&!hasHQ){
+  var wallet=countryResources[u.team]||{food:0,wood:0,gold:0},cost=buildingDefs.hq.cost;
+  var needs=['food','wood','gold'].map(type=>({type:type,score:Math.max(0,(cost[type]-(wallet[type]||0))/cost[type])})).sort((a,b)=>b.score-a.score);
+  for(var ni=0;ni<needs.length;ni++){
+   var wanted=needs[ni].type;if(needs[ni].score<=0)continue;
+   var candidates=nodes.filter(n=>n.type===wanted&&n.amount>0).sort((a,b)=>dist(u,a)-dist(u,b));
+   if(candidates.length){u.resource=wanted;u.order={type:'gather',node:candidates[0],auto:true,rebuildHQ:true};u.gatherTime=0;return true}
+  }
+ }
  var services=buildings.filter(b=>b.team===u.team&&b.hp>0&&['meatFarm','woodshop','goldmine'].includes(b.type)&&dist(u,b)<=250);
  services.sort((a,b)=>dist(u,a)-dist(u,b));
  for(var i=0;i<services.length;i++){
@@ -459,8 +470,8 @@ if(u.order&&u.order.type==='gather'){var n=u.order.node;if(!n||n.amount<=0){n=ne
 if(u.team==='p'&&techs.eff_gather)rate*=1.25;
 var amount=Math.min((nearby?12:8)*rate,n.amount);n.amount-=amount;u.carry+=amount;u.resource=n.type;
 var carryCap=(raceDefs[teamRaces[u.team]||'engineers'].workerBuild?50:40);if(u.team==='p'&&techs.plunder)carryCap+=12;
-if(u.carry>=carryCap||n.amount<=0){var depot=buildings.filter(b=>b.team===u.team&&b.type===(u.resource==='food'?'meatFarm':u.resource==='wood'?'woodshop':'goldmine')).sort((a,b)=>dist(u,a)-dist(u,b))[0]||buildings.find(b=>b.team===u.team&&b.type==='hq');if(depot){u.order={type:'return',home:depot.id};}}}}}
-else if(u.order&&u.order.type==='return'){var h=findById(u.order.home);if(h&&dist(u,h)>28)moveTo(u,h.x,h.y,dt);else if(h){var wallet=countryResources[u.team]||resources;wallet[u.resource]=(wallet[u.resource]||0)+u.carry;u.carry=0;u.order={type:'gather',node:nearestNodeAtDepot(u,u.resource)||nearestNode(u,'food'),auto:true};}}
+if(u.carry>=carryCap||n.amount<=0){var depot=buildings.filter(b=>b.team===u.team&&b.hp>0&&b.type===(u.resource==='food'?'meatFarm':u.resource==='wood'?'woodshop':'goldmine')).sort((a,b)=>dist(u,a)-dist(u,b))[0]||buildings.filter(b=>b.team===u.team&&b.hp>0).sort((a,b)=>dist(u,a)-dist(u,b))[0];if(depot){u.order={type:'return',home:depot.id};}else if(u.team!=='p'){var fieldWallet=countryResources[u.team]||resources;fieldWallet[u.resource]=(fieldWallet[u.resource]||0)+u.carry;u.carry=0;u.order=null;}}}}}
+else if(u.order&&u.order.type==='return'){var h=findById(u.order.home);if(!h||h.hp<=0){h=buildings.filter(b=>b.team===u.team&&b.hp>0).sort((a,b)=>dist(u,a)-dist(u,b))[0]||null;if(h)u.order.home=h.id;}if(h&&dist(u,h)>28)moveTo(u,h.x,h.y,dt);else if(h){var wallet=countryResources[u.team]||resources;wallet[u.resource]=(wallet[u.resource]||0)+u.carry;u.carry=0;u.order={type:'gather',node:nearestNodeAtDepot(u,u.resource)||nearestNode(u,u.resource||'food'),auto:true};}else if(u.team!=='p'){var fieldWallet=countryResources[u.team]||resources;fieldWallet[u.resource]=(fieldWallet[u.resource]||0)+u.carry;u.carry=0;u.order=null;}}
 else{var threat=nearestEnemy(u,110);if(threat&&threat.kind==='unit'&&threat.type!=='worker')shoot(u,threat,d,dt)}
 return}
 var t=u.order&&u.order.type==='attack'?findById(u.order.target):nearestEnemy(u,(u.attackRange||d.range)+80);if(u.blockedBy){var blockingWall=findById(u.blockedBy);if(blockingWall&&blockingWall.team!==u.team)t=blockingWall;}
