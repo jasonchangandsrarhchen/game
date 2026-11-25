@@ -392,7 +392,7 @@ canvas.addEventListener('mouseup',e=>{
  }
  drag=null;updateUI();
 });
-canvas.addEventListener('dblclick',e=>{if(placing)return;var p=screenToWorld(e.clientX,e.clientY),r=canvas.getBoundingClientRect();var hit=units.concat(buildings).filter(o=>o.team==='p'&&Math.hypot(o.x-p.x,o.y-p.y)<(o.kind==='building'?48:22)).sort((a,b)=>dist(a,p)-dist(b,p))[0];if(!hit)return;var radius=220;selected=units.concat(buildings).filter(o=>{if(o.team!=='p'||o.kind!==hit.kind||o.type!==hit.type||o.hp<=0)return false;var sx=(o.x-p.x)*scaleX,sy=(o.y-p.y)*scaleY;var px=r.left+ox+(o.x*scaleX),py=r.top+oy+(o.y*scaleY);return px>=r.left&&px<=r.right&&py>=r.top&&py<=r.bottom&&Math.hypot(sx,sy)<=radius});if(!selected.includes(hit))selected.unshift(hit);updateUI()});
+canvas.addEventListener('dblclick',e=>{if(placing||e.shiftKey)return;var p=screenToWorld(e.clientX,e.clientY),r=canvas.getBoundingClientRect();var hit=units.concat(buildings).filter(o=>o.team==='p'&&Math.hypot(o.x-p.x,o.y-p.y)<(o.kind==='building'?48:22)).sort((a,b)=>dist(a,p)-dist(b,p))[0];if(!hit)return;var radius=220;selected=units.concat(buildings).filter(o=>{if(o.team!=='p'||o.kind!==hit.kind||o.type!==hit.type||o.hp<=0)return false;var sx=(o.x-p.x)*scaleX,sy=(o.y-p.y)*scaleY;var px=r.left+ox+(o.x*scaleX),py=r.top+oy+(o.y*scaleY);return px>=r.left&&px<=r.right&&py>=r.top&&py<=r.bottom&&Math.hypot(sx,sy)<=radius});if(!selected.includes(hit))selected.unshift(hit);updateUI()});
 function moveTo(o,x,y,dt){var dx=x-o.x,dy=y-o.y,d=Math.hypot(dx,dy);o.blockedBy=null;if(d>5){var sp=(o.moveSpeed||defs[o.type].speed)*(raceDefs[teamRaces[o.team]||'engineers'].speed||1);
 if(o.team==='p'){
   if(techs.engines)sp*=1.15;
