@@ -475,7 +475,7 @@ var d=defs[u.type];
 if(u.team==='z'){
  var center={x:u.neutralCenterX||NEUTRAL_CENTER_X,y:u.neutralCenterY||NEUTRAL_CENTER_Y},limit=(u.neutralTerritoryRadius||NEUTRAL_RADIUS)-70,guard={x:u.neutralHomeX||center.x,y:u.neutralHomeY||center.y},target=u.order&&u.order.type==='attack'?findById(u.order.target):null;
  if(target&&(target.hp<=0||target.team==='z'||Math.hypot(target.x-center.x,target.y-center.y)>limit)){u.order=null;target=null;}
- if(!target)target=units.filter(v=>v.team!=='z'&&v.hp>0&&Math.hypot(v.x-center.x,v.y-center.y)<=limit).sort((a,b)=>dist(u,a)-dist(u,b))[0]||null;
+ if(!target)target=units.concat(buildings).filter(v=>v.team!=='z'&&v.hp>0&&Math.hypot(v.x-center.x,v.y-center.y)<=limit).sort((a,b)=>dist(u,a)-dist(u,b))[0]||null;
  if(target){u.order={type:'attack',target:target.id};shoot(u,target,d,dt);return;}
  u.order=null;if(dist(u,guard)>9)moveTo(u,guard.x,guard.y,dt);return;
 }
