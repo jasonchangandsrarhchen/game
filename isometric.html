@@ -64,7 +64,7 @@ var mini=document.getElementById('minimap'),mctx=mini.getContext('2d');
    Changes: minimap, better save/load, clearer structure, UX polish
    Original gameplay & balance intentionally preserved.
 ============================================== */
-var MAP_SCALE=2.1,W=3150,H=2100,FOG_CELL=50,FOG_COLS=63,FOG_ROWS=42,fogSeen=new Uint8Array(2646),fogNow=new Uint8Array(2646),fogTimer=0,scaleX=1,scaleY=1,pixelRatio=1,ox=0,oy=0,paused=true,speed=1,started=false,gameOver=false,last=0,acc=0,selected=[],placing=null,wallStart=null,drag=null,neutralSites=[],NEUTRAL_CENTER_X=750*MAP_SCALE,NEUTRAL_CENTER_Y=500*MAP_SCALE,NEUTRAL_RADIUS=330*MAP_SCALE;
+var MAP_SCALE=2.1,W=3150,H=2100,FOG_CELL=50,FOG_COLS=63,FOG_ROWS=42,fogSeen=new Uint8Array(2646),fogNow=new Uint8Array(2646),fogTimer=0,scaleX=1,scaleY=1,pixelRatio=1,ox=0,oy=0,isoScale=1,isoOffsetX=0,isoOffsetY=0,ISO_A=0.7071067811865476,ISO_B=0.3535533905932738,paused=true,speed=1,started=false,gameOver=false,last=0,acc=0,selected=[],placing=null,wallStart=null,drag=null,neutralSites=[],NEUTRAL_CENTER_X=750*MAP_SCALE,NEUTRAL_CENTER_Y=500*MAP_SCALE,NEUTRAL_RADIUS=330*MAP_SCALE;
 var selectedRace='engineers',teamRaces={p:'engineers',e:'ironclad',n:'rangers',s:'nomads'};
 var raceDefs={engineers:{name:'工匠聯盟',bonus:'村民採集 +35%、建造維修 +40%；建築耐久 +35%',gather:1.35,building:1.35,workerBuild:1.4,attack:1,speed:1,unique:'warden',unitName:'齒輪守衛',unitDesc:'高耐久近戰衛士；擅長守住陣線',uniqueStats:{hp:1.18,damage:1.08,speed:.94}},ironclad:{name:'鋼鐵帝國',bonus:'近戰單位傷害 +35%、生命 +20%；遠程較弱',gather:1,building:1,attack:1,speed:1,meleeDamage:1.35,meleeHp:1.2,rangedDamage:.92,unique:'breaker',unitName:'攻城破陣者',unitDesc:'重甲近戰兵；對建築造成額外破壞',uniqueStats:{hp:1.28,damage:1.18,speed:.86}},rangers:{name:'遊俠議會',bonus:'遠程單位傷害 +30%、射程 +18%；近戰較弱',gather:1,building:1,attack:1,speed:1,rangedDamage:1.3,rangedRange:1.18,meleeDamage:.88,unique:'marksman',unitName:'暮影神射手',unitDesc:'超遠射程、高單發傷害；但生命低且造價昂貴',uniqueStats:{hp:.9,damage:1.16,range:1.12,rate:1.05}},nomads:{name:'荒原游牧',bonus:'全軍移動速度 +35%；攻擊敵方單位造成傷害時，有 35% 機率掠奪 3–8 點隨機資源',gather:1.08,building:1,attack:1,speed:1.35,unique:'raider',unitName:'沙塵掠襲者',unitDesc:'高速近戰突擊騎兵；擅長快速拆除後排設施',uniqueStats:{hp:.92,damage:1.12,speed:1.22}}};
 var techDefs={
@@ -385,8 +385,9 @@ var producers=selected.filter(o=>o.team==='p'&&o.kind==='building'&&['hq','barra
 if(producerGroup.length){var rally=target?{type:'attack',target:target.id}:resourceNode?{type:'gather',node:resourceNode}:{type:'move',x:x,y:y};producerGroup.forEach(b=>b.rallyOrder=Object.assign({},rally));log('已為 '+producerGroup.length+' 座生產建築設定共同集結指令。');updateUI();return}
 selected.forEach(u=>{if(u.kind!=='unit'||u.team!=='p')return;clearAutomaticUnitOrders(u);if(target){u.order={type:'attack',target:target.id,manual:true};u.target=target.id}else if(resourceNode&&u.type==='worker'){u.order={type:'gather',node:resourceNode,manual:true};u.resource=resourceNode.type}else{u.order={type:'move',x:x,y:y,manual:true,attackMove:u.type!=='worker'};}});
 }
-function screenToWorld(cx,cy){var r=canvas.getBoundingClientRect();return{x:(cx-r.left-ox)/scaleX,y:(cy-r.top-oy)/scaleY}}
-function resize(){var r=stage.getBoundingClientRect(),dpr=Math.min(2,window.devicePixelRatio||1);pixelRatio=dpr;canvas.width=Math.floor(r.width*dpr);canvas.height=Math.floor(r.height*dpr);ctx.setTransform(dpr,0,0,dpr,0,0);scaleX=r.width/W;scaleY=r.height/H;ox=0;oy=0;if(mini){var mr=mini.getBoundingClientRect();mini.width=Math.max(120,Math.floor(mr.width));mini.height=Math.max(80,Math.floor(mr.height))}}
+function worldToScreen(x,y){return{x:isoOffsetX+isoScale*(ISO_A*x-ISO_A*y),y:isoOffsetY+isoScale*(ISO_B*x+ISO_B*y)}}
+function screenToWorld(cx,cy){var r=canvas.getBoundingClientRect(),u=(cx-r.left-isoOffsetX)/isoScale,v=(cy-r.top-isoOffsetY)/isoScale;return{x:ISO_A*u+2*ISO_A*v,y:-ISO_A*u+2*ISO_A*v}}
+function resize(){var r=stage.getBoundingClientRect(),dpr=Math.min(2,window.devicePixelRatio||1);pixelRatio=dpr;canvas.width=Math.floor(r.width*dpr);canvas.height=Math.floor(r.height*dpr);ctx.setTransform(dpr,0,0,dpr,0,0);var projectedW=ISO_A*(W+H),projectedH=ISO_B*(W+H);isoScale=Math.min(r.width/projectedW,r.height/projectedH)*0.94;isoOffsetX=r.width/2-isoScale*ISO_A*(W-H)/2;isoOffsetY=r.height/2-isoScale*ISO_B*(W+H)/2;scaleX=isoScale;scaleY=isoScale;ox=0;oy=0;if(mini){var mr=mini.getBoundingClientRect();mini.width=Math.max(120,Math.floor(mr.width));mini.height=Math.max(80,Math.floor(mr.height))}}
 window.addEventListener('resize',resize);resize();
 window.addEventListener('keydown',e=>{if(e.repeat||e.ctrlKey||e.altKey||e.metaKey)return;var tag=(document.activeElement&&document.activeElement.tagName||'').toLowerCase();if(tag==='input'||tag==='textarea'||tag==='select')return;if(e.key==='Escape'&&placing){placing=null;wallStart=null;updateUI();return}var worker=selected.length===1&&selected[0].team==='p'&&selected[0].kind==='unit'&&selected[0].type==='worker';if(!worker||placing)return;var key=e.key.toUpperCase(),type=key==='R'?'hq':Object.keys(buildHotkeys).find(k=>buildHotkeys[k]===key);if(type){e.preventDefault();startBuild(type)}});
 canvas.addEventListener('contextmenu',e=>e.preventDefault());
@@ -413,7 +414,7 @@ canvas.addEventListener('mouseup',e=>{
  }
  drag=null;updateUI();
 });
-canvas.addEventListener('dblclick',e=>{if(placing||e.shiftKey)return;var p=screenToWorld(e.clientX,e.clientY),r=canvas.getBoundingClientRect();var hit=units.concat(buildings).filter(o=>o.team==='p'&&Math.hypot(o.x-p.x,o.y-p.y)<(o.kind==='building'?48:22)).sort((a,b)=>dist(a,p)-dist(b,p))[0];if(!hit)return;var radius=220;selected=units.concat(buildings).filter(o=>{if(o.team!=='p'||o.kind!==hit.kind||o.type!==hit.type||o.hp<=0)return false;var sx=(o.x-p.x)*scaleX,sy=(o.y-p.y)*scaleY;var px=r.left+ox+(o.x*scaleX),py=r.top+oy+(o.y*scaleY);return px>=r.left&&px<=r.right&&py>=r.top&&py<=r.bottom&&Math.hypot(sx,sy)<=radius});if(!selected.includes(hit))selected.unshift(hit);updateUI()});
+canvas.addEventListener('dblclick',e=>{if(placing||e.shiftKey)return;var p=screenToWorld(e.clientX,e.clientY),r=canvas.getBoundingClientRect();var hit=units.concat(buildings).filter(o=>o.team==='p'&&Math.hypot(o.x-p.x,o.y-p.y)<(o.kind==='building'?48:22)).sort((a,b)=>dist(a,p)-dist(b,p))[0];if(!hit)return;var radius=220;selected=units.concat(buildings).filter(o=>{if(o.team!=='p'||o.kind!==hit.kind||o.type!==hit.type||o.hp<=0)return false;var q=worldToScreen(o.x,o.y),c=worldToScreen(p.x,p.y),px=r.left+q.x,py=r.top+q.y;return px>=r.left&&px<=r.right&&py>=r.top&&py<=r.bottom&&Math.hypot(q.x-c.x,q.y-c.y)<=radius});if(!selected.includes(hit))selected.unshift(hit);updateUI()});
 function moveTo(o,x,y,dt){var dx=x-o.x,dy=y-o.y,d=Math.hypot(dx,dy);o.blockedBy=null;if(d>5){var sp=(o.moveSpeed||defs[o.type].speed)*(raceDefs[teamRaces[o.team]||'engineers'].speed||1);
 if(o.team==='p'){
   if(techs.engines)sp*=1.15;
@@ -814,7 +815,7 @@ if(!tick.uiTimer)tick.uiTimer=0;tick.uiTimer+=dt;if(tick.uiTimer>=0.5){tick.uiTi
 function draw(){
 /* 每幀先恢復基礎座標，避免前一幀繪圖例外留下的 transform 污染後續畫面。 */
 ctx.setTransform(pixelRatio,0,0,pixelRatio,0,0);
-var r=stage.getBoundingClientRect();ctx.clearRect(0,0,r.width,r.height);ctx.save();ctx.translate(ox,oy);ctx.scale(scaleX,scaleY);
+var r=stage.getBoundingClientRect();ctx.clearRect(0,0,r.width,r.height);ctx.save();ctx.translate(isoOffsetX,isoOffsetY);ctx.scale(isoScale,isoScale);ctx.transform(ISO_A,ISO_B,-ISO_A,ISO_B,0,0);
 
 /* ===== Terrain (richer base + subtle regional tint) ===== */
 var grd=ctx.createLinearGradient(0,0,W,H);
