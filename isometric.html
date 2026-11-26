@@ -1178,9 +1178,9 @@ document.getElementById('start').onclick=()=>{teamRaces={p:selectedRace,e:'ironc
 document.getElementById('pause').onclick=()=>{if(!started||gameOver)return;paused=!paused;document.getElementById('pause').textContent=paused?'▶ 繼續':'Ⅱ 暫停';document.getElementById('pauseTag').style.display=paused?'block':'none'};
 document.getElementById('speed').onclick=()=>{speed=speed===1?2:speed===2?3:1;document.getElementById('speed').textContent='速度 ×'+speed};
 document.getElementById('reset').onclick=()=>{if(confirm('重新開始並重新選擇文明？')){paused=true;started=false;gameOver=false;document.getElementById('overlay').style.display='flex';document.getElementById('pause').textContent='Ⅱ 暫停';document.getElementById('pauseTag').style.display='none'}};
-document.getElementById('save').onclick=()=>{try{localStorage.setItem('frontier_save_v2',JSON.stringify({version:2,mapVersion:3,neutralBalanceVersion:4,teamUnitLevels:teamUnitLevels,resources:resources,countryResources:countryResources,units:units,buildings:buildings,nodes:nodes,neutralSites:neutralSites,elapsed:elapsed,nextId:nextId,eras:eras,techs:techs,wonderLevels:wonderLevels,wonderChosen:wonderChosen,wonderBuffs:wonderBuffs,teamRaces:teamRaces,rallyPoints:rallyPoints,selectedRace:selectedRace}));log('遊戲進度已儲存（完整四國狀態）')}catch(e){log('儲存失敗：'+e.message)}};
+document.getElementById('save').onclick=()=>{try{localStorage.setItem('frontier_iso_save_v1',JSON.stringify({version:2,mapVersion:3,neutralBalanceVersion:4,teamUnitLevels:teamUnitLevels,resources:resources,countryResources:countryResources,units:units,buildings:buildings,nodes:nodes,neutralSites:neutralSites,elapsed:elapsed,nextId:nextId,eras:eras,techs:techs,wonderLevels:wonderLevels,wonderChosen:wonderChosen,wonderBuffs:wonderBuffs,teamRaces:teamRaces,rallyPoints:rallyPoints,selectedRace:selectedRace}));log('遊戲進度已儲存（完整四國狀態）')}catch(e){log('儲存失敗：'+e.message)}};
 function load(){try{
- var raw=localStorage.getItem('frontier_save_v2')||localStorage.getItem('frontier_save');if(!raw)return false;var s=JSON.parse(raw);if(!s)return false;
+ var raw=localStorage.getItem('frontier_iso_save_v1')||localStorage.getItem('frontier_iso_save_v1');if(!raw)return false;var s=JSON.parse(raw);if(!s)return false;
  var legacy=!!(s.resources&&(s.resources.food===undefined||s.resources.ore!==undefined||s.resources.oil!==undefined));
  function migrateWallet(w){if(!w)return{food:600,wood:450,gold:250};var modern=w.food!==undefined||w.gold!==undefined;return{food:w.food!==undefined?w.food:(w.wood||0),wood:w.ore!==undefined?w.ore:(modern?(w.wood||0):0),gold:w.gold!==undefined?w.gold:(w.oil||0)}}
  resources=migrateWallet(s.resources);
@@ -1196,7 +1196,7 @@ function load(){try{
  }
  elapsed=s.elapsed||0;nextId=s.nextId||1;eras=s.eras||{p:0,e:0,n:0,s:0};teamUnitLevels=s.teamUnitLevels||{p:{},e:{},n:{},s:{}};techs=Object.assign(emptyTechs(),s.techs||{});wonderLevels=s.wonderLevels||{p:0,e:0,n:0,s:0};wonderChosen=s.wonderChosen||{p:0,e:0,n:0,s:0};wonderBuffs=s.wonderBuffs||{p:{military:0,economy:0},e:{military:0,economy:0},n:{military:0,economy:0},s:{military:0,economy:0}};teamRaces=s.teamRaces||teamRaces;rallyPoints=s.rallyPoints||{p:null,e:null,n:null,s:null};if(s.selectedRace)selectedRace=s.selectedRace;if((s.neutralBalanceVersion||0)<4){units=units.filter(u=>u.team!=='z');buildings=buildings.filter(b=>b.team!=='z');spawnNeutralGarrison();s.neutralBalanceVersion=4;}return true
  }catch(e){console.error(e);return false}}
-document.getElementById('loadBtn').onclick=()=>{if(!localStorage.getItem('frontier_save_v2')&&!localStorage.getItem('frontier_save')){alert('目前沒有可載入的存檔');return}if(load()){started=true;paused=false;gameOver=false;document.getElementById('overlay').style.display='none';updateUI();log('已載入存檔（時間 '+fmt(elapsed)+'）')}else alert('存檔損壞或格式不符')};
+document.getElementById('loadBtn').onclick=()=>{if(!localStorage.getItem('frontier_iso_save_v1')&&!localStorage.getItem('frontier_iso_save_v1')){alert('目前沒有可載入的存檔');return}if(load()){started=true;paused=false;gameOver=false;document.getElementById('overlay').style.display='none';updateUI();log('已載入存檔（時間 '+fmt(elapsed)+'）')}else alert('存檔損壞或格式不符')};
 requestAnimationFrame(frame);
 })();
 </script>
