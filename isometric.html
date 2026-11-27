@@ -820,13 +820,13 @@ function evadeIncomingSiegeFire(dt){
    var d=Math.hypot(u.x-b.tx,u.y-b.ty),safeRadius=(b.splash||0)+escapeMargin;
    if(d>=safeRadius)return;
    var eta=Math.hypot(b.tx-b.x,b.ty-b.y)/Math.max(1,b.speed||260);
-   if(!danger||eta<danger.eta)danger={x:b.tx,y:b.ty,d:d,safe:safeRadius,eta:eta};
+   if(!danger||eta<danger.eta)danger={x:b.tx,y:b.ty,d:d,safe:safeRadius,eta:eta,fastCavalry:fastCavalry,role:role,heavyArmor:heavyArmor};
   });
   if(!danger)return;
   var dx=u.x-danger.x,dy=u.y-danger.y,len=Math.hypot(dx,dy);
   if(len<0.01){var angle=((Number(u.id)||1)*2.399963229728653);dx=Math.cos(angle);dy=Math.sin(angle);len=1;}
   // Preserve the existing order. Nimble units clear a wider perimeter; armored units make a shorter withdrawal.
-  var destinationRadius=danger.safe+(fastCavalry?72:role==='ranged'?48:heavyArmor?18:38);
+  var destinationRadius=danger.safe+(danger.fastCavalry?72:danger.role==='ranged'?48:danger.heavyArmor?18:38);
   var step=Math.min(destinationRadius-danger.d,Math.max(0,(u.moveSpeed||defs[u.type].speed||55)*dt*1.65));
   if(step>0.1)moveTo(u,u.x+dx/len*step,u.y+dy/len*step,dt);
  });
