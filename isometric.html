@@ -244,7 +244,9 @@ function init(){
 fogSeen.fill(0);fogNow.fill(0);fogTimer=0;
 teamPrograms={p:0,e:0,n:0,s:0};teamUnitLevels={p:{},e:{},n:{},s:{}};resources={food:600,wood:450,gold:250};enemyResources={food:600,wood:450,gold:250};countryResources={p:resources,e:{food:600,wood:450,gold:250},n:{food:600,wood:450,gold:250},s:{food:600,wood:450,gold:250}};
 rallyPoints={p:null,e:null,n:null,s:null};techs=emptyTechs();eras={p:0,e:0,n:0,s:0};wonderLevels={p:0,e:0,n:0,s:0};wonderChosen={p:0,e:0,n:0,s:0};wonderBuffs={p:{military:0,economy:0},e:{military:0,economy:0},n:{military:0,economy:0},s:{military:0,economy:0}};aiWaveTimers={e:0,n:0,s:0};aiWaveCounts={e:1,n:1,s:1};aiMind={e:{raid:0,posture:'balanced'},n:{raid:0,posture:'balanced'},s:{raid:0,posture:'balanced'}};aiIntel={coalition:false,leader:null,power:{},goldmine:{}};units=[];buildings=[];nodes=[];neutralSites=createNeutralSites();bullets=[];effects=[];nextId=1;elapsed=0;aiTimer=0;spawnTimer=0;enemyWaveTimer=0;enemyWaveCount=1;gameOver=false;selected=[];placing=null;popCap=30;
-var bases={},spawnAngle=Math.random()*Math.PI*2,spawnTeams=['p','e','n','s'];spawnTeams.forEach((team,index)=>{var angle=spawnAngle+index*Math.PI/2,cx=W/2+Math.cos(angle)*600*MAP_SCALE,cy=H/2+Math.sin(angle)*470*MAP_SCALE;bases[team]={x:cx,y:cy,dx:Math.cos(angle)>0?-1:1,dy:Math.sin(angle)>0?-1:1};});
+var bases={},spawnTeams=['p','e','n','s'],spawnPoints=[];
+function pickSpawnPoint(){var minGap=340*MAP_SCALE,centerGap=NEUTRAL_RADIUS+150*MAP_SCALE;for(var attempt=0;attempt<600;attempt++){var point={x:(300+Math.random()*(W/MAP_SCALE-600))*MAP_SCALE,y:(230+Math.random()*(H/MAP_SCALE-460))*MAP_SCALE};if(Math.hypot(point.x-NEUTRAL_CENTER_X,point.y-NEUTRAL_CENTER_Y)<centerGap)continue;if(spawnPoints.every(p=>Math.hypot(p.x-point.x,p.y-point.y)>=minGap))return point;}return{x:(350+Math.random()*(W/MAP_SCALE-700))*MAP_SCALE,y:(260+Math.random()*(H/MAP_SCALE-520))*MAP_SCALE};}
+spawnTeams.forEach(team=>{var point=pickSpawnPoint();spawnPoints.push(point);var vx=point.x-W/2,vy=point.y-H/2,len=Math.max(1,Math.hypot(vx,vy));bases[team]={x:point.x,y:point.y,dx:vx/len,dy:vy/len};});
 Object.keys(bases).forEach(team=>{var q=bases[team];makeBuilding(team,'hq',q.x,q.y);makeBuilding(team,'barracks',q.x+q.dx*112*MAP_SCALE,q.y+q.dy*65*MAP_SCALE);if(team!=='p')makeBuilding(team,'fort',q.x+q.dx*205*MAP_SCALE,q.y+q.dy*5*MAP_SCALE);for(var i=0;i<4;i++)makeUnit(team,'worker',q.x+q.dx*(70+i*17)*MAP_SCALE,q.y+q.dy*(95+(i%2)*18)*MAP_SCALE);for(var j=0;j<(team==='p'?1:3);j++)makeUnit(team,'rifle',q.x+q.dx*(155+j*18)*MAP_SCALE,q.y+q.dy*(45+(j%2)*18)*MAP_SCALE);});
 // 中央遺跡守軍：強大但不擴張，僅在中央領地內反擊。
 spawnNeutralGarrison();
@@ -606,7 +608,7 @@ if(t&&t.hp>0){if(u.team!=='p'&&rangedTactics(u,t,dt)){}else shoot(u,t,d,dt);}els
 function updateBuilding(b,dt){
 if(b.team==='p'&&b.repeatType&&b.queue.length===0)startRepeatProduction(b);
 if(b.unitUpgrade){b.unitUpgrade.remain-=dt;if(b.unitUpgrade.remain<=0){var job=b.unitUpgrade;finishUnitUpgrade(b.team,job.type,job.level);b.unitUpgrade=null;if(b.team==='p')updateUI()}}
-if(b.queue&&b.queue.length){var q=b.queue[0];q.remain-=dt;if(q.remain<=0){var d=buildingDefs[b.type],rally=b.rallyOrder||rallyPoints[b.team]||{x:b.x,y:b.y};var born=makeUnit(b.team,q.type,rally.x+(Math.random()-.5)*35,rally.y+35+(Math.random()-.5)*25);if(b.rallyOrder){var ro=b.rallyOrder;if(ro.type==='attack'&&findById(ro.target))born.order={type:'attack',target:ro.target};else if(ro.type==='gather'&&ro.node&&ro.node.amount>0){born.order={type:'gather',node:ro.node};born.resource=ro.node.type}else if(ro.type==='move')born.order={type:'move',x:ro.x,y:ro.y};}b.queue.shift();if(b.team==='p'){log('部隊完成：'+unitName(q.type,b.team));if(b.repeatType&&b.queue.length===0)startRepeatProduction(b);updateUI()}}}
+if(b.queue&&b.queue.length){var q=b.queue[0];q.remain-=dt;if(q.remain<=0){var bd=buildingDefs[b.type]||{w:70,h:70},ro=b.rallyOrder||null,globalRally=!ro?rallyPoints[b.team]:null,rally=ro||globalRally||null,spawnX=b.x+(Math.random()-.5)*Math.min(64,bd.w||64),spawnY=b.y+(bd.h||70)*.5+26+(Math.random()-.5)*18,born=makeUnit(b.team,q.type,spawnX,spawnY);if(rally){if(rally.type==='attack'&&findById(rally.target)){born.order={type:'attack',target:rally.target};born.target=rally.target;}else if(rally.type==='gather'&&rally.node&&rally.node.amount>0){born.order={type:'gather',node:rally.node};born.resource=rally.node.type;}else if(rally.type==='move'&&Number.isFinite(rally.x)&&Number.isFinite(rally.y)){born.order={type:'move',x:rally.x,y:rally.y,attackMove:q.type!=='worker'};}}b.queue.shift();if(b.team==='p'){log('部隊完成：'+unitName(q.type,b.team));if(b.repeatType&&b.queue.length===0)startRepeatProduction(b);updateUI()}}}
 if(b.type==='turret'){var target=nearestEnemy(b,b.neutralDefenseRange||210);if(target){b.cool=(b.cool||0)-dt;if(b.cool<=0){b.cool=b.neutralDefenseRate||1.0;bullets.push({x:b.x,y:b.y,tx:target.x,ty:target.y,team:b.team,source:b.id,damage:b.neutralDefenseDamage||18,speed:460,type:'turret'})}}}if(b.type==='fort'){units.forEach(u=>{if(u.team===b.team&&u.hp>0&&dist(u,b)<115)u.hp=Math.min(u.max,u.hp+7*dt)});}
 if(b.type==='bunker'){var bt=nearestEnemy(b,175);if(bt){b.cool=(b.cool||0)-dt;if(b.cool<=0){b.cool=1.25;bullets.push({x:b.x,y:b.y,tx:bt.x,ty:bt.y,team:b.team,source:b.id,damage:13,speed:380,type:'bunker'})}}}
 if(b.type==='cannon'){var ct=nearestEnemy(b,b.neutralDefenseRange||275);if(ct){b.cool=(b.cool||0)-dt;if(b.cool<=0){b.cool=b.neutralDefenseRate||3.4;bullets.push({x:b.x,y:b.y,tx:ct.x,ty:ct.y,team:b.team,source:b.id,damage:b.neutralDefenseDamage||100,speed:600,type:'cannon',splash:b.team==='z'?72:0})}}}
@@ -630,36 +632,28 @@ function teamPowerScore(team){
  score+=(eras[team]||0)*13+(wonderLevels[team]||0)*9+siteScore;
  return score;
 }
-function refreshStrategicIntel(){
- var alive=['p','e','n','s'].filter(t=>buildings.some(b=>b.team===t&&b.type==='hq')||units.some(u=>u.team===t&&u.type==='worker'));
- var power={},goldmine={};alive.forEach(t=>{power[t]=teamPowerScore(t);var wallet=countryResources[t]||{gold:0};var deposits=nodes.filter(n=>n.zone===t&&n.type==='gold'&&n.amount>0).reduce((sum,n)=>sum+n.amount,0);var mines=buildings.filter(b=>b.team===t&&b.type==='goldmine'&&b.hp>0).length;goldmine[t]=(wallet.gold||0)+deposits*.05+mines*120;});
- var leader=alive.slice().sort((a,b)=>power[b]-power[a])[0]||null;
- var rivals=alive.filter(t=>t!=='p'),avg=rivals.length?rivals.reduce((v,t)=>v+power[t],0)/rivals.length:0;
- aiIntel={power:power,goldmine:goldmine,leader:leader,coalition:leader==='p'&&rivals.length>=2&&power.p>avg*1.28&&rivals.every(t=>power.p>(power[t]||0)*1.12)};
-}
+function refreshStrategicIntel(){aiIntel={coalition:false,leader:null,power:{},goldmine:{}};}
 function assessAI(team){
- var mind=aiMind[team],wallet=countryResources[team]||{food:0,wood:0,gold:0};
- var intelPower=(typeof aiIntel==='object'&&aiIntel&&typeof aiIntel.power==='object'&&aiIntel.power)?aiIntel.power:{},own=intelPower[team]||teamPowerScore(team),enemyMax=0;
- ['p','e','n','s'].filter(t=>t!==team).forEach(t=>enemyMax=Math.max(enemyMax,intelPower[t]||0));
+ var mind=aiMind[team],wallet=countryResources[team]||{food:0,wood:0,gold:0},own=teamPowerScore(team),enemyMax=0,visibleEnemyTeams=[];
+ ['p','e','n','s'].filter(t=>t!==team).forEach(enemy=>{var visibleUnits=units.filter(u=>u.team===enemy&&u.hp>0&&teamCanSee(team,u.x,u.y)),visibleBuildings=buildings.filter(b=>b.team===enemy&&b.hp>0&&teamCanSee(team,b.x,b.y));if(!visibleUnits.length&&!visibleBuildings.length)return;visibleEnemyTeams.push(enemy);var score=visibleUnits.length*8+visibleBuildings.length*12;visibleUnits.forEach(u=>score+=Math.max(0,Number(u.hp)||0)/Math.max(1,Number(u.max)||1)*5);visibleBuildings.forEach(b=>score+=Math.max(0,Number(b.hp)||0)/Math.max(1,Number(b.max)||1)*7);enemyMax=Math.max(enemyMax,score);});
  var ownArmy=units.filter(u=>u.team===team&&u.hp>0&&!['worker','medic'].includes(u.type));
  var hq=buildings.find(b=>b.team===team&&b.type==='hq');
  var nearbyThreat=!!hq&&units.some(u=>u.team!==team&&u.hp>0&&teamCanSee(team,u.x,u.y)&&!['worker','medic'].includes(u.type)&&dist(u,hq)<390);
  var relative=enemyMax?own/enemyMax:1;
  mind.posture=nearbyThreat?'defend':relative<.58?'desperate':relative<.82?'behind':relative>1.18?'dominant':'balanced';
- var pa=units.filter(u=>u.team==='p'&&u.hp>0&&teamCanSee(team,u.x,u.y)&&!['worker','medic'].includes(u.type));
+ var pa=units.filter(u=>u.team!=='z'&&u.team!==team&&u.hp>0&&teamCanSee(team,u.x,u.y)&&!['worker','medic'].includes(u.type));
  var v=pa.filter(u=>['tank','heavy','scout','raider'].includes(u.type)).length;
- var a=pa.filter(u=>u.type==='artillery').length;
+ var a=pa.filter(u=>['artillery','eng_siege','iron_mortar','ranger_ballista','nomad_bombard','eng_colossus','iron_dreadnought','ranger_skybreaker','nomad_meteor'].includes(u.type)).length;
  var i=pa.filter(u=>['melee','rifle','rocket','warden','breaker','marksman'].includes(u.type)).length;
  mind.counter=pa.length?(v/pa.length>.32?'rocket':a/pa.length>.22?'scout':i/pa.length>.62?'artillery':'rifle'):'rifle';
- return {mind:mind,posture:mind.posture,ownArmy:ownArmy,nearbyThreat:nearbyThreat,relative:relative,wallet:wallet};
+ return {mind:mind,posture:mind.posture,ownArmy:ownArmy,nearbyThreat:nearbyThreat,relative:relative,wallet:wallet,visibleEnemyTeams:visibleEnemyTeams};
 }
 function chooseStrategicTarget(team,ehq,posture){
  var targets=buildings.filter(b=>b.team!==team&&b.team!=='z'&&b.hp>0&&teamCanSee(team,b.x,b.y));
  if(!targets.length){var angle=Math.atan2(H/2-ehq.y,W/2-ehq.x)+(Math.random()-.5)*2.2,radius=NEUTRAL_RADIUS+180+Math.random()*420;return{explore:true,x:Math.max(40,Math.min(W-40,W/2+Math.cos(angle)*radius)),y:Math.max(40,Math.min(H-40,H/2+Math.sin(angle)*radius)),type:'exploration',team:null};}
- var rivals=Array.from(new Set(targets.map(b=>b.team))),targetTeam;
- if(aiIntel.coalition&&rivals.includes('p'))targetTeam='p';
- else{var strategicGold=(aiIntel&&aiIntel.goldmine&&typeof aiIntel.goldmine==='object')?aiIntel.goldmine:{};rivals.sort((a,b)=>(strategicGold[b]||0)-(strategicGold[a]||0));targetTeam=rivals[0];}
- var visibleTargets=targets.filter(b=>b.team===targetTeam),role={e:'economy',n:'production',s:'defense'}[team]||'economy';
+ var rivals=Array.from(new Set(targets.map(b=>b.team)));
+ rivals.sort((a,b)=>{var ac=targets.filter(o=>o.team===a).length,bc=targets.filter(o=>o.team===b).length;return ac-bc||Math.min.apply(null,targets.filter(o=>o.team===a).map(o=>dist(ehq,o)))-Math.min.apply(null,targets.filter(o=>o.team===b).map(o=>dist(ehq,o)));});
+ var targetTeam=rivals[0],visibleTargets=targets.filter(b=>b.team===targetTeam),role={e:'economy',n:'production',s:'defense'}[team]||'economy';
  var preferred=visibleTargets.filter(b=>role==='economy'?['meatFarm','woodshop','goldmine'].includes(b.type):role==='production'?['barracks','factory','lab'].includes(b.type):['fort','turret','bunker','cannon','missile'].includes(b.type));
  if(posture==='behind'||posture==='desperate')preferred=visibleTargets.filter(b=>['meatFarm','woodshop','goldmine','barracks','factory','lab'].includes(b.type));
  if(!preferred.length)preferred=visibleTargets.filter(b=>b.type==='hq');
