@@ -251,7 +251,7 @@ var patches=[['food',[[360,90],[90,360],[1140,90],[1410,360],[360,910],[90,640],
 patches.forEach(v=>v[1].forEach(p=>{for(var a=0;a<v[2];a++)for(var b=0;b<v[3];b++)node(v[0],(p[0]+a*v[4])*MAP_SCALE,(p[1]+b*v[5])*MAP_SCALE,v[6])}));
 updateUI();log('四國混戰開始：四國爭奪中央資源、世界奇觀與四座中立據點。佔領據點可取得經濟、軍事或特殊兵種優勢。');
 }
-function countPop(team){return units.filter(u=>u.team===team).reduce((a,u)=>a+defs[u.type].pop,0)}
+function countPop(team){return units.filter(u=>u&&u.team===team&&Number(u.hp)>0&&defs[u.type]).reduce((a,u)=>a+(Number(defs[u.type].pop)||0),0)}
 function teamPopCap(team){return 30+buildings.filter(b=>b.team===team&&b.type==='hq').length*10+buildings.filter(b=>b.team===team&&b.type==='fort').length*5+buildings.filter(b=>b.team===team&&b.type==='house').length*20}
 function myCap(){return teamPopCap('p')}
 var producerActiveCategory='全部';
