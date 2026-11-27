@@ -254,9 +254,11 @@ updateUI();log('四國混戰開始：四國爭奪中央資源、世界奇觀與�
 function countPop(team){return units.filter(u=>u.team===team).reduce((a,u)=>a+defs[u.type].pop,0)}
 function teamPopCap(team){return 30+buildings.filter(b=>b.team===team&&b.type==='hq').length*10+buildings.filter(b=>b.team===team&&b.type==='fort').length*5+buildings.filter(b=>b.team===team&&b.type==='house').length*20}
 function myCap(){return teamPopCap('p')}
+var producerActiveCategory='全部';
 function updateUI(){
 selected=selected.filter(o=>o&&(o.kind==='neutralSite'||Number(o.hp)>0));ui.food.textContent=Math.floor(resources.food);ui.wood.textContent=Math.floor(resources.wood);ui.gold.textContent=Math.floor(resources.gold);ui.pop.textContent=countPop('p')+'/'+myCap();ui.era.textContent=eraName('p');
-try{renderActions();renderSelection()}catch(err){console.error('UI render error',err);ui.selection.textContent='介面更新錯誤：'+(err&&err.message?err.message:'未知錯誤');ui.actions.replaceChildren()}
+var actionsScroll=ui.actions.scrollTop,producerList=ui.actions.querySelector('.producer-list'),producerScroll=producerList?producerList.scrollTop:0;
+try{renderActions();renderSelection();ui.actions.scrollTop=actionsScroll;producerList=ui.actions.querySelector('.producer-list');if(producerList)producerList.scrollTop=producerScroll}catch(err){console.error('UI render error',err);ui.selection.textContent='介面更新錯誤：'+(err&&err.message?err.message:'未知錯誤');ui.actions.replaceChildren()}
 }
 var buildHotkeys={house:'H',wall:'T',barracks:'1',factory:'2',meatFarm:'3',woodshop:'4',goldmine:'5',turret:'6',fort:'7',lab:'8',bunker:'9',depot:'0',cannon:'Q',missile:'W',wonder:'E'};
 function startBuild(k){var d=buildingDefs[k];if(!d||!selected.some(o=>o.team==='p'&&o.kind==='unit'&&o.type==='worker'))return;if(factionBuildingRace[k]&&factionBuildingRace[k]!==teamRaces.p){log('此建築僅限特定文明建造。');return}if(k==='hq'&&buildings.some(v=>v.team==='p'&&v.type==='hq')){log('主堡尚未被摧毀，無須重建。');return}if(eras.p<minEraForBuilding(k)||!canPay(d.cost)){log('無法建造：時代或資源不足。');return}placing=k;wallStart=null;log(k==='wall'?'城牆模式：右鍵設定起點，再右鍵設定終點；Esc取消。':'選擇建造'+buildingName(k,'p')+'：按右鍵放置，Esc 取消。');renderActions()}
@@ -273,7 +275,7 @@ function renderProducerCatalog(group,type,multi){
  var categories=['全部','步兵','機動','攻城','支援'];
  var tabs=document.createElement('div');tabs.className='producer-tabs';
  var list=document.createElement('div');list.className='producer-list';
- var active='全部';
+ var active=producerActiveCategory;
  function renderList(){list.replaceChildren();var shown=types.filter(k=>active==='全部'||producerCategory(k)===active);
   if(!shown.length){var empty=document.createElement('div');empty.className='muted';empty.textContent='此分類目前沒有可生產兵種。';empty.style.gridColumn='1/-1';list.appendChild(empty);return}
   shown.forEach(function(k){var d=defs[k],card=document.createElement('div');card.className='producer-card';
@@ -291,7 +293,7 @@ function renderProducerCatalog(group,type,multi){
    card.appendChild(upgradeBtn);list.appendChild(card);
   });
  }
- categories.forEach(function(cat){var tab=document.createElement('button');tab.textContent=cat;tab.className=cat===active?'active':'';tab.onclick=function(){active=cat;Array.from(tabs.children).forEach(function(el){el.classList.toggle('active',el.textContent===cat)});renderList()};tabs.appendChild(tab)});
+ categories.forEach(function(cat){var tab=document.createElement('button');tab.textContent=cat;tab.className=cat===active?'active':'';tab.onclick=function(){active=cat;producerActiveCategory=cat;Array.from(tabs.children).forEach(function(el){el.classList.toggle('active',el.textContent===cat)});renderList()};tabs.appendChild(tab)});
  ui.actions.appendChild(tabs);ui.actions.appendChild(list);renderList();
 }
 
