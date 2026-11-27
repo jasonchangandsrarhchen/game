@@ -9,7 +9,7 @@
 #top{height:54px;background:#17232d;border-bottom:1px solid #344653;display:flex;align-items:center;gap:18px;padding:0 14px}
 .brand{font-weight:900;letter-spacing:1px;color:#f2c66d;font-size:16px}.stat{color:#cbd6dc}.stat b{color:#fff;margin-left:4px;font-variant-numeric:tabular-nums}
 #layout{height:calc(100vh - 54px);display:grid;grid-template-columns:minmax(0,1fr) 280px}
-#stage{position:relative;min-width:0;min-height:0;background:#18251e}canvas{display:block;width:100%;height:100%;cursor:crosshair}
+#stage{position:relative;min-width:0;min-height:0;background:#18251e}canvas{display:block;width:100%;height:100%;cursor:crosshair;touch-action:none}#stage{cursor:crosshair}
 #side{background:#17232d;border-left:1px solid #344653;display:flex;flex-direction:column;min-height:0}
 .panel{padding:12px;border-bottom:1px solid #344653}.panel h3{margin:0 0 9px;font-size:12px;letter-spacing:1px;color:#90a8b5;text-transform:uppercase}
 .actions{display:grid;grid-template-columns:1fr 1fr;gap:7px}
@@ -30,7 +30,7 @@ button.primary{background:#785a27;border-color:#c99b45;color:#fff}button.danger{
 </head>
 <body>
 <header id="top"><div class="brand">⚔ FRONTIER COMMAND <span style="font-size:11px;opacity:.7;font-weight:600">Grok</span></div><div class="stat">肉<b id="food">300</b></div><div class="stat">木材<b id="wood">220</b></div><div class="stat">金礦<b id="gold">100</b></div><div class="stat">人口<b id="pop">5/30</b></div><div class="stat">文明<b id="era">石器時代</b></div><div style="margin-left:auto;display:flex;gap:6px"><button id="pause">Ⅱ 暫停</button><button id="speed">速度 ×1</button><button id="save">存檔</button><button id="reset" class="danger">重開</button></div></header>
-<div id="layout"><main id="stage"><canvas id="game"></canvas><canvas id="minimap" width="180" height="120"></canvas><div id="zoomControls" aria-label="地圖縮放"><button type="button" id="zoomOut" title="縮小">−</button><span id="zoomLevel">100%</span><button type="button" id="zoomIn" title="放大">＋</button><button type="button" id="zoomReset" title="恢復全地圖">全圖</button></div><div id="pauseTag">PAUSED</div><div id="hint">左鍵選取單位／建築　右鍵移動、攻擊或採集　拖曳框選　｜　右下角小地圖｜中立據點可佔領</div><div id="overlay"><div class="modal"><h1>前線指揮官｜2.5D 實驗版</h1><p style="font-size:13px;color:#90a8b5;margin:0 0 10px">獨立副本 · Isometric Prototype</p><p>四國自由混戰：藍方（你）、紅方、紫方、金方從地圖四角出發。三個 AI 國家彼此敵對，也會主動發展、爭奪中央資源、中立據點與世界奇觀並發動攻擊。中立補給站提供資源，軍械庫強化攻擊，聖泉提升新生部隊生命，傭兵營地可招募自由傭兵。</p><p>消滅其他三國主堡即可獲勝；己方主堡被摧毀後，只要仍有工程平民，就能支付資源重建主堡。</p><p style="font-size:12px;color:#91a3ad">操作：左鍵選取／框選　右鍵移動攻擊採集　1–0 Q W E T 建造快捷鍵　Esc 取消</p><button id="start" class="primary">開始戰役</button><button id="loadBtn" style="margin-top:6px;background:#2a3d4a">載入存檔</button></div></div></main>
+<div id="layout"><main id="stage"><canvas id="game"></canvas><canvas id="minimap" width="180" height="120"></canvas><div id="zoomControls" aria-label="地圖縮放"><button type="button" id="zoomOut" title="縮小">−</button><span id="zoomLevel">100%</span><button type="button" id="zoomIn" title="放大">＋</button><button type="button" id="zoomReset" title="恢復全地圖">全圖</button></div><div id="pauseTag">PAUSED</div><div id="hint">左鍵選取／拖曳框選　空白鍵＋左鍵或滑鼠中鍵拖曳平移　右鍵移動／攻擊／採集　｜　右下角小地圖｜中立據點可佔領</div><div id="overlay"><div class="modal"><h1>前線指揮官｜2.5D 實驗版</h1><p style="font-size:13px;color:#90a8b5;margin:0 0 10px">獨立副本 · Isometric Prototype</p><p>四國自由混戰：藍方（你）、紅方、紫方、金方從地圖四角出發。三個 AI 國家彼此敵對，也會主動發展、爭奪中央資源、中立據點與世界奇觀並發動攻擊。中立補給站提供資源，軍械庫強化攻擊，聖泉提升新生部隊生命，傭兵營地可招募自由傭兵。</p><p>消滅其他三國主堡即可獲勝；己方主堡被摧毀後，只要仍有工程平民，就能支付資源重建主堡。</p><p style="font-size:12px;color:#91a3ad">操作：左鍵選取／框選　右鍵移動攻擊採集　1–0 Q W E T 建造快捷鍵　Esc 取消</p><button id="start" class="primary">開始戰役</button><button id="loadBtn" style="margin-top:6px;background:#2a3d4a">載入存檔</button></div></div></main>
 <aside id="side"><section class="panel"><h3>指揮選單</h3><div id="selection">尚未選取單位。<div class="muted">選取平民後可建造設施；選取軍隊後可下達攻擊命令。</div></div></section><section class="panel"><h3>建造／生產</h3><div class="actions" id="actions"></div></section><section class="panel" style="grid-column:1/-1;min-height:0;display:flex;flex-direction:column"><h3>戰場情報</h3><div id="log"></div></section></aside></div>
 <script>
 (function(){
@@ -65,7 +65,7 @@ var mini=document.getElementById('minimap'),mctx=mini.getContext('2d');
    Changes: minimap, better save/load, clearer structure, UX polish
    Original gameplay & balance intentionally preserved.
 ============================================== */
-var MAP_SCALE=2.1,W=3150,H=2100,FOG_CELL=50,FOG_COLS=63,FOG_ROWS=42,fogSeen=new Uint8Array(2646),fogNow=new Uint8Array(2646),fogTimer=0,scaleX=1,scaleY=1,pixelRatio=1,ox=0,oy=0,isoScale=1,isoFitScale=1,isoZoom=1,isoOffsetX=0,isoOffsetY=0,ISO_A=0.7071067811865476,ISO_B=0.3535533905932738,paused=true,speed=1,started=false,gameOver=false,last=0,acc=0,selected=[],placing=null,wallStart=null,drag=null,neutralSites=[],NEUTRAL_CENTER_X=750*MAP_SCALE,NEUTRAL_CENTER_Y=500*MAP_SCALE,NEUTRAL_RADIUS=330*MAP_SCALE;
+var MAP_SCALE=2.1,W=3150,H=2100,FOG_CELL=50,FOG_COLS=63,FOG_ROWS=42,fogSeen=new Uint8Array(2646),fogNow=new Uint8Array(2646),fogTimer=0,scaleX=1,scaleY=1,pixelRatio=1,ox=0,oy=0,isoScale=1,isoFitScale=1,isoZoom=1,isoOffsetX=0,isoOffsetY=0,panDrag=null,spacePan=false,ISO_A=0.7071067811865476,ISO_B=0.3535533905932738,paused=true,speed=1,started=false,gameOver=false,last=0,acc=0,selected=[],placing=null,wallStart=null,drag=null,neutralSites=[],NEUTRAL_CENTER_X=750*MAP_SCALE,NEUTRAL_CENTER_Y=500*MAP_SCALE,NEUTRAL_RADIUS=330*MAP_SCALE;
 var selectedRace='engineers',teamRaces={p:'engineers',e:'ironclad',n:'rangers',s:'nomads'};
 var raceDefs={engineers:{name:'工匠聯盟',bonus:'村民採集 +35%、建造維修 +40%；建築耐久 +35%',gather:1.35,building:1.35,workerBuild:1.4,attack:1,speed:1,unique:'warden',unitName:'齒輪守衛',unitDesc:'高耐久近戰衛士；擅長守住陣線',uniqueStats:{hp:1.18,damage:1.08,speed:.94}},ironclad:{name:'鋼鐵帝國',bonus:'近戰單位傷害 +35%、生命 +20%；遠程較弱',gather:1,building:1,attack:1,speed:1,meleeDamage:1.35,meleeHp:1.2,rangedDamage:.92,unique:'breaker',unitName:'攻城破陣者',unitDesc:'重甲近戰兵；對建築造成額外破壞',uniqueStats:{hp:1.28,damage:1.18,speed:.86}},rangers:{name:'遊俠議會',bonus:'遠程單位傷害 +30%、射程 +18%；近戰較弱',gather:1,building:1,attack:1,speed:1,rangedDamage:1.3,rangedRange:1.18,meleeDamage:.88,unique:'marksman',unitName:'暮影神射手',unitDesc:'超遠射程、高單發傷害；但生命低且造價昂貴',uniqueStats:{hp:.9,damage:1.16,range:1.12,rate:1.05}},nomads:{name:'荒原游牧',bonus:'全軍移動速度 +35%；攻擊敵方單位造成傷害時，有 35% 機率掠奪 3–8 點隨機資源',gather:1.08,building:1,attack:1,speed:1.35,unique:'raider',unitName:'沙塵掠襲者',unitDesc:'高速近戰突擊騎兵；擅長快速拆除後排設施',uniqueStats:{hp:.92,damage:1.12,speed:1.22}}};
 var techDefs={
@@ -393,12 +393,17 @@ function updateZoomLabel(){var el=document.getElementById('zoomLevel');if(el)el.
 function setIsoZoom(next,cx,cy){var r=stage.getBoundingClientRect(),px=Number.isFinite(cx)?cx-r.left:r.width/2,py=Number.isFinite(cy)?cy-r.top:r.height/2;var nextZoom=Math.max(.65,Math.min(4,next)),nextScale=isoFitScale*nextZoom,ratio=nextScale/isoScale;isoOffsetX=px-(px-isoOffsetX)*ratio;isoOffsetY=py-(py-isoOffsetY)*ratio;isoZoom=nextZoom;isoScale=nextScale;scaleX=isoScale;scaleY=isoScale;updateZoomLabel()}
 function resetIsoZoom(){var r=stage.getBoundingClientRect();isoZoom=1;isoScale=isoFitScale;isoOffsetX=r.width/2-isoScale*ISO_A*(W-H)/2;isoOffsetY=r.height/2-isoScale*ISO_B*(W+H)/2;scaleX=isoScale;scaleY=isoScale;updateZoomLabel()}
 canvas.addEventListener('wheel',function(e){e.preventDefault();setIsoZoom(isoZoom*(e.deltaY<0?1.16:1/1.16),e.clientX,e.clientY)},{passive:false});
+window.addEventListener('keyup',e=>{if(e.code==='Space'){spacePan=false;if(!panDrag)canvas.style.cursor='crosshair'}});
+window.addEventListener('blur',()=>{spacePan=false;finishPan()});
 window.addEventListener('resize',resize);resize();
 document.getElementById('zoomIn').addEventListener('click',()=>setIsoZoom(isoZoom*1.2));document.getElementById('zoomOut').addEventListener('click',()=>setIsoZoom(isoZoom/1.2));document.getElementById('zoomReset').addEventListener('click',resetIsoZoom);
-window.addEventListener('keydown',e=>{if(e.repeat||e.ctrlKey||e.altKey||e.metaKey)return;if(e.key==='+'||e.key==='='){e.preventDefault();setIsoZoom(isoZoom*1.2);return}if(e.key==='-'){e.preventDefault();setIsoZoom(isoZoom/1.2);return}if(e.key==='0'){e.preventDefault();resetIsoZoom();return}var tag=(document.activeElement&&document.activeElement.tagName||'').toLowerCase();if(tag==='input'||tag==='textarea'||tag==='select')return;if(e.key==='Escape'&&placing){placing=null;wallStart=null;updateUI();return}var worker=selected.length===1&&selected[0].team==='p'&&selected[0].kind==='unit'&&selected[0].type==='worker';if(!worker||placing)return;var key=e.key.toUpperCase(),type=key==='R'?'hq':Object.keys(buildHotkeys).find(k=>buildHotkeys[k]===key);if(type){e.preventDefault();startBuild(type)}});
+window.addEventListener('keydown',e=>{if(e.code==='Space'&&!e.repeat&&!/INPUT|TEXTAREA|SELECT/.test((e.target&&e.target.tagName)||'')){e.preventDefault();spacePan=true;if(!panDrag)canvas.style.cursor='grab';return}if(e.repeat||e.ctrlKey||e.altKey||e.metaKey)return;if(e.key==='+'||e.key==='='){e.preventDefault();setIsoZoom(isoZoom*1.2);return}if(e.key==='-'){e.preventDefault();setIsoZoom(isoZoom/1.2);return}if(e.key==='0'){e.preventDefault();resetIsoZoom();return}var tag=(document.activeElement&&document.activeElement.tagName||'').toLowerCase();if(tag==='input'||tag==='textarea'||tag==='select')return;if(e.key==='Escape'&&placing){placing=null;wallStart=null;updateUI();return}var worker=selected.length===1&&selected[0].team==='p'&&selected[0].kind==='unit'&&selected[0].type==='worker';if(!worker||placing)return;var key=e.key.toUpperCase(),type=key==='R'?'hq':Object.keys(buildHotkeys).find(k=>buildHotkeys[k]===key);if(type){e.preventDefault();startBuild(type)}});
 canvas.addEventListener('contextmenu',e=>e.preventDefault());
-canvas.addEventListener('mousedown',e=>{var p=screenToWorld(e.clientX,e.clientY);if(e.button===2){rightClick(p.x,p.y);return}drag={x:p.x,y:p.y,cx:e.clientX,cy:e.clientY}});
+canvas.addEventListener('mousedown',e=>{if(e.button===1||(e.button===0&&spacePan)){e.preventDefault();panDrag={cx:e.clientX,cy:e.clientY,ox:isoOffsetX,oy:isoOffsetY};canvas.style.cursor='grabbing';return}var p=screenToWorld(e.clientX,e.clientY);if(e.button===2){rightClick(p.x,p.y);return}if(e.button!==0)return;drag={x:p.x,y:p.y,cx:e.clientX,cy:e.clientY}});
+function finishPan(){if(!panDrag)return;panDrag=null;canvas.style.cursor=spacePan?'grab':'crosshair'}
+window.addEventListener('mouseup',finishPan);
 canvas.addEventListener('mouseup',e=>{
+ if(panDrag){finishPan();return}
  if(!drag)return;
  var p=screenToWorld(e.clientX,e.clientY),isBox=Math.hypot(e.clientX-drag.cx,e.clientY-drag.cy)>8;
  if(isBox){
@@ -1089,7 +1094,7 @@ units.filter(u=>u.team==='p'||fogCanSee(u.x,u.y)).forEach(u=>{
   var race=raceKey(u.team);
   var phase=u.walkPhase||0,bob=u.moving?Math.sin(phase)*2.2:0,fire=u.fireAnim||0;
   var angle=Number.isFinite(u.facing)?u.facing:0;
-  ctx.save();ctx.translate(u.x,u.y);ctx.rotate(angle);ctx.translate(0,bob);ctx.lineCap='round';ctx.lineJoin='round';
+  ctx.save();ctx.translate(u.x,u.y);ctx.transform(ISO_B/(2*ISO_A*ISO_B),-ISO_B/(2*ISO_A*ISO_B),ISO_A/(2*ISO_A*ISO_B),ISO_A/(2*ISO_A*ISO_B),0,0);var ux=Math.cos(angle),uy=Math.sin(angle),screenAngle=Math.atan2(ISO_B*(ux+uy),ISO_A*(ux-uy));ctx.rotate(screenAngle);ctx.translate(0,bob);ctx.lineCap='round';ctx.lineJoin='round';
   var human=['worker','rifle','rocket','medic','warden','breaker','marksman'].includes(u.type)||['infantry','support','anti'].includes((defs[u.type]||{}).kind);
 
   if(human){
@@ -1214,9 +1219,9 @@ units.filter(u=>u.team==='p'||fogCanSee(u.x,u.y)).forEach(function(u){
   var pal=factionPalette(u.team),a=Number.isFinite(u.facing)?u.facing:0;
   var vehicle=['tank','artillery','heavy','scout','raider','nomad_chariot','nomad_bombard','eng_colossus','iron_dreadnought','ranger_skybreaker','nomad_meteor'].includes(u.type);
   var bw=vehicle?23:13,bh=vehicle?15:11,ht=vehicle?13:19;
-  ctx.save();ctx.translate(u.x,u.y);
+  ctx.save();ctx.translate(u.x,u.y);ctx.transform(ISO_B/(2*ISO_A*ISO_B),-ISO_B/(2*ISO_A*ISO_B),ISO_A/(2*ISO_A*ISO_B),ISO_A/(2*ISO_A*ISO_B),0,0);var ux2=Math.cos(a),uy2=Math.sin(a),screenAngle2=Math.atan2(ISO_B*(ux2+uy2),ISO_A*(ux2-uy2));
   ctx.fillStyle='rgba(0,0,0,.38)';ctx.beginPath();ctx.ellipse(4,5,bw*.9,bh*.72,0,0,Math.PI*2);ctx.fill();
-  ctx.rotate(a);
+  ctx.rotate(screenAngle2);
   // Feet / tracks and the body top are separate planes, giving a raised silhouette
   ctx.fillStyle=pal[2];ctx.fillRect(-bw/2,-bh/2,bw,bh);
   var unitLift=-ht/(2*ISO_B);ctx.save();ctx.translate(unitLift,unitLift);
@@ -1266,6 +1271,7 @@ if(mctx){
 }
 }
 var mouse={x:700,y:500};canvas.addEventListener('mousemove',e=>{var p=screenToWorld(e.clientX,e.clientY);mouse=p});
+window.addEventListener('mousemove',e=>{if(!panDrag)return;isoOffsetX=panDrag.ox+(e.clientX-panDrag.cx);isoOffsetY=panDrag.oy+(e.clientY-panDrag.cy)});
 function frame(t){var dt=Math.min(.05,(t-last)/1000||0);last=t;try{if(!paused&&!gameOver){acc+=dt*speed;var steps=0;while(acc>=.05&&steps<8&&!paused&&!gameOver){try{tick(.05)}catch(err){paused=true;acc=0;console.error('RTS tick error:',err);log('遊戲已安全暫停：'+(err&&err.message?err.message:String(err))+'。請回報此訊息。');document.getElementById('pauseTag').style.display='block';document.getElementById('pause').textContent='▶ 繼續';break}acc-=.05;steps++}}try{draw()}catch(err){paused=true;console.error('RTS draw error:',err);try{if(typeof ctx.reset==='function')ctx.reset();else ctx.setTransform(1,0,0,1,0,0)}catch(resetErr){console.error('Canvas recovery failed:',resetErr)}log('畫面繪製錯誤：'+(err&&err.message?err.message:String(err))+'。已重置畫布狀態，請回報此訊息。');} }catch(err){paused=true;console.error('RTS frame error:',err);log('遊戲主迴圈錯誤：'+(err&&err.message?err.message:String(err))+'。');}requestAnimationFrame(frame)}
 var racePicker=document.createElement('div');racePicker.id='racePicker';racePicker.style.cssText='display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px;margin:16px 0';
 Object.keys(raceDefs).forEach(key=>{var r=raceDefs[key],card=document.createElement('button');card.type='button';card.style.cssText='text-align:left;white-space:normal;padding:12px;border:2px solid '+(key===selectedRace?'#f4cf70':'#536477')+';background:'+(key===selectedRace?'#344a5a':'#202e3b')+';color:#fff;border-radius:10px';card.innerHTML='<b>'+r.name+'</b><div style="font-size:12px;margin:6px 0;color:#f4cf70">'+r.bonus+'</div><div style="font-size:12px">專屬兵種：'+r.unitName+' — '+r.unitDesc+'</div>';card.onclick=()=>{selectedRace=key;racePicker.querySelectorAll('button').forEach(el=>el.style.borderColor='#536477');card.style.borderColor='#f4cf70'};racePicker.appendChild(card)});
