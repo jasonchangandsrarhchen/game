@@ -815,8 +815,8 @@ function evadeIncomingSiegeFire(dt){
    if(b.team===u.team)return;
    var role=u.combat&&u.combat.role||defs[u.type].role||'ranged';
    var fastCavalry=['raider','nomad_chariot','nomad_lancer','ranger_lancer','scout'].includes(u.type);
-   var heavyArmor=['breaker','warden','heavy','tank','iron_mortar','artillery'].includes(u.type);
-   var escapeMargin=fastCavalry?148:role==='ranged'?118:heavyArmor?38:88;
+   var heavyArmor=['breaker','warden','heavy','tank','iron_tank','iron_ram'].includes(u.type);
+   var escapeMargin=fastCavalry?148:heavyArmor?38:role==='ranged'?118:88;
    var d=Math.hypot(u.x-b.tx,u.y-b.ty),safeRadius=(b.splash||0)+escapeMargin;
    if(d>=safeRadius)return;
    var eta=Math.hypot(b.tx-b.x,b.ty-b.y)/Math.max(1,b.speed||260);
