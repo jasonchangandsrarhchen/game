@@ -774,7 +774,7 @@ function enemyAIFor(team,dt){
  var queuedPop=buildings.filter(b=>b.team===team).reduce((sum,b)=>sum+(b.queue||[]).reduce((n,q)=>n+(defs[q.type]?.pop||0),0),0)+neutralSites.filter(z=>z.owner===team).reduce((sum,z)=>sum+(z.queue||[]).reduce((n,q)=>n+(defs[q.type]?.pop||0),0),0);
  var pop=countPop(team)+queuedPop,cap=teamPopCap(team);
  if(pop>=cap-10){var houses=eb.filter(b=>b.type==='house').length;buildE('house',ehq.x-150-houses*72,ehq.y+225+(houses%2)*62);cap=teamPopCap(team);}
- var playerArmy=units.filter(u=>u.team==='p'&&u.hp>0&&!['worker','medic'].includes(u.type));
+ var playerArmy=units.filter(u=>u.team==='p'&&u.hp>0&&teamCanSee(team,u.x,u.y)&&!['worker','medic'].includes(u.type));
  var pInf=playerArmy.filter(u=>['infantry','anti'].includes((defs[u.type]||{}).kind)).length;
  var pMelee=playerArmy.filter(u=>(defs[u.type].role||'ranged')==='melee').length;
  var pVeh=playerArmy.filter(u=>(defs[u.type]||{}).kind==='vehicle').length;
