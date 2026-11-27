@@ -30,7 +30,7 @@ button.primary{background:#785a27;border-color:#c99b45;color:#fff}button.danger{
 </head>
 <body>
 <header id="top"><div class="brand">⚔ FRONTIER COMMAND <span style="font-size:11px;opacity:.7;font-weight:600">Grok</span></div><div class="stat">肉<b id="food">300</b></div><div class="stat">木材<b id="wood">220</b></div><div class="stat">金礦<b id="gold">100</b></div><div class="stat">人口<b id="pop">5/30</b></div><div class="stat">文明<b id="era">石器時代</b></div><div style="margin-left:auto;display:flex;gap:6px"><button id="pause">Ⅱ 暫停</button><button id="speed">速度 ×1</button><button id="save">存檔</button><button id="reset" class="danger">重開</button></div></header>
-<div id="layout"><main id="stage"><canvas id="game"></canvas><canvas id="minimap" width="180" height="120"></canvas><div id="zoomControls" aria-label="地圖縮放"><button type="button" id="zoomOut" title="縮小">−</button><span id="zoomLevel">100%</span><button type="button" id="zoomIn" title="放大">＋</button><button type="button" id="zoomReset" title="恢復全地圖">全圖</button></div><div id="pauseTag">PAUSED</div><div id="hint">左鍵選取／拖曳框選　空白鍵＋左鍵或滑鼠中鍵拖曳平移　右鍵移動／攻擊／採集　｜　右下角小地圖｜中立據點可佔領</div><div id="overlay"><div class="modal"><h1>前線指揮官｜2.5D 實驗版</h1><p style="font-size:13px;color:#90a8b5;margin:0 0 10px">獨立副本 · Isometric Prototype</p><p>四國自由混戰：藍方（你）、紅方、紫方、金方從地圖四角出發。三個 AI 國家彼此敵對，也會主動發展、爭奪中央資源、中立據點與世界奇觀並發動攻擊。中立補給站提供資源，軍械庫強化攻擊，聖泉提升新生部隊生命，傭兵營地可招募自由傭兵。</p><p>消滅其他三國主堡即可獲勝；己方主堡被摧毀後，只要仍有工程平民，就能支付資源重建主堡。</p><p style="font-size:12px;color:#91a3ad">操作：左鍵點擊選取／拖曳框選；右鍵下指令；滑鼠中鍵拖曳或空白鍵＋左鍵拖曳平移地圖；滾輪縮放；1–0 Q W E T 建造快捷鍵；Esc 取消</p><button id="start" class="primary">開始戰役</button><button id="loadBtn" style="margin-top:6px;background:#2a3d4a">載入存檔</button></div></div></main>
+<div id="layout"><main id="stage"><canvas id="game"></canvas><canvas id="minimap" width="180" height="120"></canvas><div id="zoomControls" aria-label="地圖縮放"><button type="button" id="zoomOut" title="縮小">−</button><span id="zoomLevel">100%</span><button type="button" id="zoomIn" title="放大">＋</button><button type="button" id="zoomReset" title="恢復全地圖">全圖</button></div><div id="pauseTag">PAUSED</div><div id="hint">左鍵選取／拖曳框選　空白鍵＋左鍵或滑鼠中鍵拖曳平移　右鍵下指令　｜　敵方攻城砲彈接近時部隊會自動散開</div><div id="overlay"><div class="modal"><h1>前線指揮官｜2.5D 實驗版</h1><p style="font-size:13px;color:#90a8b5;margin:0 0 10px">獨立副本 · Isometric Prototype</p><p>四國自由混戰：藍方（你）、紅方、紫方、金方從地圖四角出發。三個 AI 國家彼此敵對，也會主動發展、爭奪中央資源、中立據點與世界奇觀並發動攻擊。中立補給站提供資源，軍械庫強化攻擊，聖泉提升新生部隊生命，傭兵營地可招募自由傭兵。</p><p>消滅其他三國主堡即可獲勝；己方主堡被摧毀後，只要仍有工程平民，就能支付資源重建主堡。</p><p style="font-size:12px;color:#91a3ad">操作：左鍵點擊選取／拖曳框選；右鍵下指令；滑鼠中鍵拖曳或空白鍵＋左鍵拖曳平移地圖；滾輪縮放；1–0 Q W E T 建造快捷鍵；Esc 取消</p><button id="start" class="primary">開始戰役</button><button id="loadBtn" style="margin-top:6px;background:#2a3d4a">載入存檔</button></div></div></main>
 <aside id="side"><section class="panel"><h3>指揮選單</h3><div id="selection">尚未選取單位。<div class="muted">選取平民後可建造設施；選取軍隊後可下達攻擊命令。</div></div></section><section class="panel"><h3>建造／生產</h3><div class="actions" id="actions"></div></section><section class="panel" style="grid-column:1/-1;min-height:0;display:flex;flex-direction:column"><h3>戰場情報</h3><div id="log"></div></section></aside></div>
 <script>
 (function(){
@@ -779,9 +779,38 @@ function projectileHitsWall(x1,y1,x2,y2,w){
  var clip=(p,q)=>{if(Math.abs(p)<1e-9)return q>=0;var r=q/p;if(p<0){if(r>t1)return false;if(r>t0)t0=r}else{if(r<t0)return false;if(r<t1)t1=r}return true};
  return clip(-dx,ax+hw)&&clip(dx,hw-ax)&&clip(-dy,ay+hh)&&clip(dy,hh-ay)&&t0<=t1;
 }
+/* Incoming siege-fire awareness: units instinctively spread away from an imminent blast. */
+function evadeIncomingSiegeFire(dt){
+ var siegeTypes=['artillery','eng_siege','iron_mortar','ranger_ballista','nomad_bombard','eng_colossus','iron_dreadnought','ranger_skybreaker','nomad_meteor','neutral_siege','cannon'];
+ var threats=bullets.filter(function(b){
+  if(!b||b.dead||!(b.splash>=58)||siegeTypes.indexOf(b.type)<0)return false;
+  var remaining=Math.hypot(b.tx-b.x,b.ty-b.y)/Math.max(1,b.speed||260);
+  return remaining>0.04&&remaining<=2.35;
+ });
+ if(!threats.length)return;
+ units.forEach(function(u){
+  if(!u||u.hp<=0)return;
+  var danger=null;
+  threats.forEach(function(b){
+   if(b.team===u.team)return;
+   var d=Math.hypot(u.x-b.tx,u.y-b.ty),safeRadius=(b.splash||0)+92;
+   if(d>=safeRadius)return;
+   var eta=Math.hypot(b.tx-b.x,b.ty-b.y)/Math.max(1,b.speed||260);
+   if(!danger||eta<danger.eta)danger={x:b.tx,y:b.ty,d:d,safe:safeRadius,eta:eta};
+  });
+  if(!danger)return;
+  var dx=u.x-danger.x,dy=u.y-danger.y,len=Math.hypot(dx,dy);
+  if(len<0.01){var angle=((Number(u.id)||1)*2.399963229728653);dx=Math.cos(angle);dy=Math.sin(angle);len=1;}
+  // Preserve the unit's existing order; this is a short evasive sidestep, not a new command.
+  var destinationRadius=danger.safe+58;
+  var step=Math.min(destinationRadius-danger.d,Math.max(0,(u.moveSpeed||defs[u.type].speed||55)*dt*1.65));
+  if(step>0.1)moveTo(u,u.x+dx/len*step,u.y+dy/len*step,dt);
+ });
+}
 function tick(dt){
 elapsed+=dt;enemyAI(dt);updateFog(dt);
 units.slice().forEach(u=>{if(u.hp>0)updateUnit(u,dt)});
+evadeIncomingSiegeFire(dt);
 buildings.slice().forEach(b=>{if(b.hp>0)updateBuilding(b,dt)});var teams=['p','e','n','s','z'];
  neutralSites.forEach(site=>{
   var present=teams.map(t=>({team:t,count:units.filter(u=>u.team===t&&u.hp>0&&dist(u,site)<112).length})).filter(v=>v.count>0);
