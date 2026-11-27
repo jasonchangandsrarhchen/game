@@ -29,11 +29,11 @@ button.primary{background:#785a27;border-color:#c99b45;color:#fff}button.danger{
 
 /* Producer panel: fixed-size unit cards with category tabs and an independently scrollable list. */
 #side .panel:nth-child(2){min-height:0;flex:1;display:flex;flex-direction:column;overflow:hidden}
-#actions{min-height:0;min-width:0;overflow-y:auto;overflow-x:hidden;display:flex;flex-direction:column;gap:7px;padding-right:3px;overscroll-behavior:contain}
+#actions{flex:1;min-height:0;min-width:0;overflow-y:auto;overflow-x:hidden;display:flex;flex-direction:column;gap:7px;padding-right:3px;overscroll-behavior:contain}
 .producer-tabs{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:5px;flex:0 0 auto}
 .producer-tabs button{padding:7px 3px;font-size:11px;white-space:nowrap}
 .producer-tabs button.active{background:#785a27;border-color:#c99b45;color:#fff}
-.producer-list{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:7px;min-height:0;overflow-y:auto;overflow-x:hidden;padding:1px 3px 5px 1px;align-content:start;overscroll-behavior:contain}
+.producer-list{flex:1 1 auto;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:7px;min-height:0;overflow-y:auto;overflow-x:hidden;padding:1px 3px 5px 1px;align-content:start;overscroll-behavior:contain}
 .producer-card{min-width:0;border:1px solid #405563;border-radius:7px;background:#1d2d38;padding:7px;display:flex;flex-direction:column;gap:5px}
 .producer-card strong{font-size:12px;line-height:1.35;overflow-wrap:anywhere}
 .producer-card .producer-cost{font-size:11px;color:#aebdc5;min-height:16px}
