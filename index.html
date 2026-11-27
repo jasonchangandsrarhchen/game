@@ -374,12 +374,18 @@ function autoAssignWorkerResource(u){
 function nearestEnemy(u,range){var best=null,bd=range||1e9;units.concat(buildings).forEach(o=>{if(o.team===u.team||o.hp<=0)return;if(o.team==='z'&&u.team!=='z')return;if(u.team==='z'){var cx=u.neutralCenterX||NEUTRAL_CENTER_X,cy=u.neutralCenterY||NEUTRAL_CENTER_Y,limit=(u.neutralTerritoryRadius||NEUTRAL_RADIUS)-70;if(Math.hypot(o.x-cx,o.y-cy)>limit)return;}var d=dist(u,o);if(d<bd){bd=d;best=o}});return best}
  function clearAutomaticUnitOrders(u){if(!u)return;if(u.order&&!u.order.manual&&(u.order.type==='heal'||u.order.stanceOrder||u.order.auto))u.order=null;u.autoHealReturnOrder=null;u.autoHealTarget=null;}
  function enemyOnAttackMovePath(u,order){var dx=order.x-u.x,dy=order.y-u.y,len2=dx*dx+dy*dy;if(len2<1)return null;var best=null,bestAlong=Infinity;units.concat(buildings).forEach(function(o){if(o.team===u.team||o.team==='z'||o.hp<=0)return;var t=((o.x-u.x)*dx+(o.y-u.y)*dy)/len2;if(t<0||t>1)return;var px=u.x+t*dx,py=u.y+t*dy,side=Math.hypot(o.x-px,o.y-py),corridor=o.kind==='building'?Math.max(82,Math.max(buildingDefs[o.type].w,buildingDefs[o.type].h)*.55):72;if(side>corridor)return;var along=t*Math.sqrt(len2);if(along<bestAlong){bestAlong=along;best=o;}});return best;}
-function rightClick(x,y){
+function rightClick(x,y,forceMove){
 if(placing==='wall'){if(!wallStart){wallStart={x:x,y:y};log('城牆起點已設定，請右鍵設定終點。');return}var sx=wallStart.x,sy=wallStart.y,dx=x-sx,dy=y-sy,len=Math.hypot(dx,dy);if(len<30){log('終點距離太近，請重新設定。');return}var count=Math.max(1,Math.ceil(len/76)),angle=Math.atan2(dy,dx),d=buildingDefs.wall,points=[];for(var wi=0;wi<count;wi++){var t=(wi+.5)/count,wx=sx+dx*t,wy=sy+dy*t;if(!canBuildAt('wall',wx,wy)||buildings.some(b=>b.type==='wall'&&dist(b,{x:wx,y:wy})<58)){log('城牆路線碰到既有建築或超出地圖，請重新選擇起終點。');wallStart=null;return}points.push({x:wx,y:wy})}var total={food:d.cost.food*count,wood:d.cost.wood*count};if(!canPay(total)){log('資源不足：這段城牆需要 '+costText(total));wallStart=null;return}pay(total);points.forEach(p=>{var wb=makeBuilding('p','wall',p.x,p.y);wb.angle=angle});log('連續城牆完成：'+count+' 段。');placing=null;wallStart=null;updateUI();return}if(placing){var d=buildingDefs[placing];if(!canBuildAt(placing,x,y)){log('建造失敗：此處與己方／敵方建築重疊，或超出地圖範圍。');return}if(eras.p<minEraForBuilding(placing)){log('尚未進入可建造此設施的時代');return}if(!pay(d.cost)){log('資源不足');return}var built=makeBuilding('p',placing,x,y);if(placing==='wonder'){wonderLevels.p=1;built.level=1;log('世界奇觀落成！選取奇觀，選擇軍事或經濟文明加成。')}else if(placing==='hq'){log('主堡重建完成！你重新取得文明升級與平民生產能力。')}else log('完成建造：'+buildingName(placing,'p'));placing=null;updateUI();return}
 if(!selected.length)return;
 var captureTarget=neutralSites.find(z=>dist(z,{x:x,y:y})<65);if(captureTarget&&selected.some(o=>o.kind==='unit'&&o.team==='p')){selected.filter(o=>o.kind==='unit'&&o.team==='p').forEach(u=>{clearAutomaticUnitOrders(u);u.order={type:'capture',x:captureTarget.x,y:captureTarget.y,siteId:captureTarget.id,manual:true};});log('部隊前往佔領：'+captureTarget.name+'。');updateUI();return}
 var friendlyBuilding=buildings.find(o=>o.team==='p'&&o.hp<o.max&&Math.hypot(o.x-x,o.y-y)<Math.max(34,Math.max(buildingDefs[o.type].w,buildingDefs[o.type].h)*.65));if(friendlyBuilding&&selected.some(u=>u.kind==='unit'&&u.type==='worker')){selected.forEach(u=>{if(u.kind==='unit'&&u.type==='worker'&&u.team==='p'){clearAutomaticUnitOrders(u);u.order={type:'repair',target:friendlyBuilding.id,manual:true};}});log('村民開始維修：'+buildingName(friendlyBuilding.type,'p'));updateUI();return}
 var target=units.concat(buildings).find(o=>o.team!=='p'&&Math.hypot(o.x-x,o.y-y)<Math.max(22,o.kind==='building'?40:20));
+var bombardTypes=['artillery','eng_siege','iron_mortar','ranger_ballista','nomad_bombard','eng_colossus','iron_dreadnought','ranger_skybreaker','nomad_meteor'];
+var bombarders=selected.filter(o=>o.team==='p'&&o.kind==='unit'&&bombardTypes.includes(o.type));
+if(!forceMove&&!target&&!nodes.some(n=>n.amount>0&&dist(n,{x:x,y:y})<35)&&bombarders.length){
+ bombarders.forEach(u=>{clearAutomaticUnitOrders(u);u.order={type:'bombard',x:x,y:y,manual:true};});
+ log('已下達預先轟炸命令：砲兵將持續轟擊指定地區，重新下達指令即可停止。');updateUI();return;
+}
 var resourceNode=nodes.find(n=>n.amount>0&&dist(n,{x:x,y:y})<35);
 var producers=selected.filter(o=>o.team==='p'&&o.kind==='building'&&['hq','barracks','factory'].includes(o.type));var producerGroup=producers.length===selected.length&&producers.length>0&&producers.every(o=>o.type===producers[0].type)?producers:[];
 if(producerGroup.length){var rally=target?{type:'attack',target:target.id}:resourceNode?{type:'gather',node:resourceNode}:{type:'move',x:x,y:y};producerGroup.forEach(b=>b.rallyOrder=Object.assign({},rally));log('已為 '+producerGroup.length+' 座生產建築設定共同集結指令。');updateUI();return}
@@ -390,7 +396,7 @@ function resize(){var r=stage.getBoundingClientRect(),dpr=Math.min(2,window.devi
 window.addEventListener('resize',resize);resize();
 window.addEventListener('keydown',e=>{if(e.repeat||e.ctrlKey||e.altKey||e.metaKey)return;var tag=(document.activeElement&&document.activeElement.tagName||'').toLowerCase();if(tag==='input'||tag==='textarea'||tag==='select')return;if(e.key==='Escape'&&placing){placing=null;wallStart=null;updateUI();return}var worker=selected.length===1&&selected[0].team==='p'&&selected[0].kind==='unit'&&selected[0].type==='worker';if(!worker||placing)return;var key=e.key.toUpperCase(),type=key==='R'?'hq':Object.keys(buildHotkeys).find(k=>buildHotkeys[k]===key);if(type){e.preventDefault();startBuild(type)}});
 canvas.addEventListener('contextmenu',e=>e.preventDefault());
-canvas.addEventListener('mousedown',e=>{var p=screenToWorld(e.clientX,e.clientY);if(e.button===2){rightClick(p.x,p.y);return}drag={x:p.x,y:p.y,cx:e.clientX,cy:e.clientY}});
+canvas.addEventListener('mousedown',e=>{var p=screenToWorld(e.clientX,e.clientY);if(e.button===2){rightClick(p.x,p.y,e.shiftKey);return}drag={x:p.x,y:p.y,cx:e.clientX,cy:e.clientY}});
 canvas.addEventListener('mouseup',e=>{
  if(!drag)return;
  var p=screenToWorld(e.clientX,e.clientY),isBox=Math.hypot(e.clientX-drag.cx,e.clientY-drag.cy)>8;
@@ -469,6 +475,18 @@ function rangedTactics(u,target,dt){
  if(distToTarget<=range)shoot(u,target,defs[u.type],dt);
  return true;
 }
+function fireGroundBombard(u,x,y,dt){
+ var d=defs[u.type],range=u.attackRange||d.range,dd=Math.hypot(x-u.x,y-u.y);
+ if(dd>range){moveTo(u,x,y,dt);return;}
+ u.moving=false;u.facing=Math.atan2(y-u.y,x-u.x);u.cool=(u.cool||0)-dt;
+ if(u.cool<=0){
+  u.cool=u.attackRate||d.rate;u.fireAnim=.24;
+  var damage=(u.attackDamage||d.damage)*.82;
+  var splash=({artillery:66,eng_siege:78,iron_mortar:72,ranger_ballista:58,nomad_bombard:68,eng_colossus:90,iron_dreadnought:100,ranger_skybreaker:82,nomad_meteor:88})[u.type]||60;
+  var muzzle=u.type==='artillery'?22:18;
+  bullets.push({x:u.x+Math.cos(u.facing)*muzzle,y:u.y+Math.sin(u.facing)*muzzle,tx:x,ty:y,team:u.team,source:u.id,damage:damage,speed:u.type==='artillery'?260:230,type:u.type,splash:splash});
+ }
+}
 function updateUnit(u,dt){
 u.fireAnim=Math.max(0,(u.fireAnim||0)-dt);u.moving=false;
 var d=defs[u.type];
@@ -479,7 +497,8 @@ if(u.team==='z'){
  if(target){u.order={type:'attack',target:target.id};shoot(u,target,d,dt);return;}
  u.order=null;if(dist(u,guard)>9)moveTo(u,guard.x,guard.y,dt);return;
 }
-var manualOrder=!!(u.order&&u.order.manual);if(manualOrder){u.autoHealReturnOrder=null;u.autoHealTarget=null;}if(!manualOrder&&u.combatStance==='retreat'){var retreatBuilding=u.order&&u.order.type==='retreat'?findById(u.order.target):null;if(!retreatBuilding||retreatBuilding.hp<=0||retreatBuilding.team!==u.team||!((buildingDefs[retreatBuilding.type]||{}).auraHealUnits>0||retreatBuilding.type==='fort'||retreatBuilding.type==='depot'))retreatBuilding=setRetreatOrder(u);if(retreatBuilding){var retreatRadius=retreatBuilding.type==='fort'?105:retreatBuilding.type==='depot'?90:170;if(dist(u,retreatBuilding)>retreatRadius)moveTo(u,retreatBuilding.x,retreatBuilding.y,dt);else u.moving=false;}else u.order=null;return}if(!manualOrder&&u.order&&u.order.type==='stanceFlee'){moveTo(u,u.order.x,u.order.y,dt);if(Math.hypot(u.x-u.order.x,u.y-u.order.y)<9)u.order=null;return}if(u.type==='medic'&&!manualOrder){var patient=units.filter(v=>v.team===u.team&&v!==u&&v.hp>0&&v.hp<v.max&&dist(u,v)<180).sort((a,b)=>(a.hp/a.max)-(b.hp/b.max))[0];if(patient){if(dist(u,patient)>28)moveTo(u,patient.x,patient.y,dt);else patient.hp=Math.min(patient.max,patient.hp+13*dt)}return}if(!manualOrder&&u.team!=='p'&&u.type!=='worker'&&u.order?.type!=='heal'&&u.hp/u.max<=.35){var healers=units.filter(v=>v.team===u.team&&v.type==='medic'&&v.hp>0).concat(buildings.filter(b=>b.team===u.team&&b.hp>0&&(b.type==='fort'||b.type==='depot')));healers=healers.filter(v=>dist(u,v)<650).sort((a,b)=>dist(u,a)-dist(u,b));if(healers.length){u.autoHealReturnOrder=u.order?Object.assign({},u.order):null;u.autoHealTarget=healers[0].id;u.order={type:'heal',target:healers[0].id};}}if(u.order&&u.order.type==='heal'){var hs=findById(u.order.target);if(!hs||hs.hp<=0||u.hp/u.max>=.82){u.order=u.autoHealReturnOrder||null;u.autoHealReturnOrder=null;u.autoHealTarget=null;}else{var radius=hs.type==='fort'||hs.type==='depot'?62:26;if(dist(u,hs)>radius)moveTo(u,hs.x,hs.y,dt);return}}if(u.order&&(u.order.type==='move'||u.order.type==='capture')){if(u.order.type==='move'&&u.order.attackMove){var pathEnemy=enemyOnAttackMovePath(u,u.order);if(pathEnemy){shoot(u,pathEnemy,d,dt);return;}}moveTo(u,u.order.x,u.order.y,dt);if(Math.hypot(u.x-u.order.x,u.y-u.order.y)<(u.order.type==='capture'?72:7))u.order=null;return}
+var manualOrder=!!(u.order&&u.order.manual);if(manualOrder){u.autoHealReturnOrder=null;u.autoHealTarget=null;}if(!manualOrder&&u.combatStance==='retreat'){var retreatBuilding=u.order&&u.order.type==='retreat'?findById(u.order.target):null;if(!retreatBuilding||retreatBuilding.hp<=0||retreatBuilding.team!==u.team||!((buildingDefs[retreatBuilding.type]||{}).auraHealUnits>0||retreatBuilding.type==='fort'||retreatBuilding.type==='depot'))retreatBuilding=setRetreatOrder(u);if(retreatBuilding){var retreatRadius=retreatBuilding.type==='fort'?105:retreatBuilding.type==='depot'?90:170;if(dist(u,retreatBuilding)>retreatRadius)moveTo(u,retreatBuilding.x,retreatBuilding.y,dt);else u.moving=false;}else u.order=null;return}if(!manualOrder&&u.order&&u.order.type==='stanceFlee'){moveTo(u,u.order.x,u.order.y,dt);if(Math.hypot(u.x-u.order.x,u.y-u.order.y)<9)u.order=null;return}if(u.type==='medic'&&!manualOrder){var patient=units.filter(v=>v.team===u.team&&v!==u&&v.hp>0&&v.hp<v.max&&dist(u,v)<180).sort((a,b)=>(a.hp/a.max)-(b.hp/b.max))[0];if(patient){if(dist(u,patient)>28)moveTo(u,patient.x,patient.y,dt);else patient.hp=Math.min(patient.max,patient.hp+13*dt)}return}if(!manualOrder&&u.team!=='p'&&u.type!=='worker'&&u.order?.type!=='heal'&&u.hp/u.max<=.35){var healers=units.filter(v=>v.team===u.team&&v.type==='medic'&&v.hp>0).concat(buildings.filter(b=>b.team===u.team&&b.hp>0&&(b.type==='fort'||b.type==='depot')));healers=healers.filter(v=>dist(u,v)<650).sort((a,b)=>dist(u,a)-dist(u,b));if(healers.length){u.autoHealReturnOrder=u.order?Object.assign({},u.order):null;u.autoHealTarget=healers[0].id;u.order={type:'heal',target:healers[0].id};}}if(u.order&&u.order.type==='heal'){var hs=findById(u.order.target);if(!hs||hs.hp<=0||u.hp/u.max>=.82){u.order=u.autoHealReturnOrder||null;u.autoHealReturnOrder=null;u.autoHealTarget=null;}else{var radius=hs.type==='fort'||hs.type==='depot'?62:26;if(dist(u,hs)>radius)moveTo(u,hs.x,hs.y,dt);return}}if(u.order&&u.order.type==='bombard'){fireGroundBombard(u,u.order.x,u.order.y,dt);return}
+if(u.order&&(u.order.type==='move'||u.order.type==='capture')){if(u.order.type==='move'&&u.order.attackMove){var pathEnemy=enemyOnAttackMovePath(u,u.order);if(pathEnemy){shoot(u,pathEnemy,d,dt);return;}}moveTo(u,u.order.x,u.order.y,dt);if(Math.hypot(u.x-u.order.x,u.y-u.order.y)<(u.order.type==='capture'?72:7))u.order=null;return}
 if(u.type==='worker'){
 if(!u.order)autoAssignWorkerResource(u);
 if(!u.order||u.order.type!=='repair'){var nearbyDamaged=buildings.filter(b=>b.team===u.team&&b.hp>0&&b.hp<b.max-1&&dist(u,b)<=190).sort((a,b)=>dist(u,a)-dist(u,b))[0];if(nearbyDamaged&&(countryResources[u.team]||resources).food>=3){u.autoRepairReturnOrder=u.order?Object.assign({},u.order):null;u.order={type:'repair',target:nearbyDamaged.id,auto:true};}}
@@ -767,9 +786,42 @@ function projectileHitsWall(x1,y1,x2,y2,w){
  var clip=(p,q)=>{if(Math.abs(p)<1e-9)return q>=0;var r=q/p;if(p<0){if(r>t1)return false;if(r>t0)t0=r}else{if(r<t0)return false;if(r<t1)t1=r}return true};
  return clip(-dx,ax+hw)&&clip(dx,hw-ax)&&clip(-dy,ay+hh)&&clip(dy,hh-ay)&&t0<=t1;
 }
+/* Incoming siege-fire awareness: units instinctively spread away from an imminent blast. */
+function evadeIncomingSiegeFire(dt){
+ var siegeTypes=['artillery','eng_siege','iron_mortar','ranger_ballista','nomad_bombard','eng_colossus','iron_dreadnought','ranger_skybreaker','nomad_meteor','neutral_siege','cannon'];
+ var threats=bullets.filter(function(b){
+  if(!b||b.dead||!(b.splash>=58)||siegeTypes.indexOf(b.type)<0)return false;
+  var remaining=Math.hypot(b.tx-b.x,b.ty-b.y)/Math.max(1,b.speed||260);
+  return remaining>0.04&&remaining<=2.35;
+ });
+ if(!threats.length)return;
+ units.forEach(function(u){
+  if(!u||u.hp<=0)return;
+  var danger=null;
+  threats.forEach(function(b){
+   if(b.team===u.team)return;
+   var role=u.combat&&u.combat.role||defs[u.type].role||'ranged';
+   var fastCavalry=['raider','nomad_chariot','nomad_lancer','ranger_lancer','scout'].includes(u.type);
+   var heavyArmor=['breaker','warden','heavy','tank','iron_tank','iron_ram'].includes(u.type);
+   var escapeMargin=fastCavalry?148:heavyArmor?38:role==='ranged'?118:88;
+   var d=Math.hypot(u.x-b.tx,u.y-b.ty),safeRadius=(b.splash||0)+escapeMargin;
+   if(d>=safeRadius)return;
+   var eta=Math.hypot(b.tx-b.x,b.ty-b.y)/Math.max(1,b.speed||260);
+   if(!danger||eta<danger.eta)danger={x:b.tx,y:b.ty,d:d,safe:safeRadius,eta:eta,fastCavalry:fastCavalry,role:role,heavyArmor:heavyArmor};
+  });
+  if(!danger)return;
+  var dx=u.x-danger.x,dy=u.y-danger.y,len=Math.hypot(dx,dy);
+  if(len<0.01){var angle=((Number(u.id)||1)*2.399963229728653);dx=Math.cos(angle);dy=Math.sin(angle);len=1;}
+  // Preserve the existing order. Nimble units clear a wider perimeter; armored units make a shorter withdrawal.
+  var destinationRadius=danger.safe+(danger.fastCavalry?72:danger.role==='ranged'?48:danger.heavyArmor?18:38);
+  var step=Math.min(destinationRadius-danger.d,Math.max(0,(u.moveSpeed||defs[u.type].speed||55)*dt*1.65));
+  if(step>0.1)moveTo(u,u.x+dx/len*step,u.y+dy/len*step,dt);
+ });
+}
 function tick(dt){
 elapsed+=dt;enemyAI(dt);updateFog(dt);
 units.slice().forEach(u=>{if(u.hp>0)updateUnit(u,dt)});
+evadeIncomingSiegeFire(dt);
 buildings.slice().forEach(b=>{if(b.hp>0)updateBuilding(b,dt)});var teams=['p','e','n','s','z'];
  neutralSites.forEach(site=>{
   var present=teams.map(t=>({team:t,count:units.filter(u=>u.team===t&&u.hp>0&&dist(u,site)<112).length})).filter(v=>v.count>0);
