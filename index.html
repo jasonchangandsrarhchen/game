@@ -25,6 +25,20 @@ button.primary{background:#785a27;border-color:#c99b45;color:#fff}button.danger{
 #pauseTag{position:absolute;top:12px;left:12px;color:#f2c66d;font-weight:900;display:none;text-shadow:0 2px 5px #000}
 #minimap{position:absolute;right:12px;bottom:12px;width:180px;height:120px;background:rgba(10,18,24,.18);border:1px solid rgba(160,190,200,.45);border-radius:6px;pointer-events:none;z-index:2}
 @media(max-width:760px){#layout{grid-template-columns:1fr;grid-template-rows:minmax(0,1fr) 220px}#side{border-left:0;border-top:1px solid #344653;display:grid;grid-template-columns:1fr 1fr;grid-template-rows:auto 1fr}#log{max-height:140px}.panel{padding:8px}.actions{grid-template-columns:repeat(3,1fr)}button{padding:7px 4px;font-size:11px}#top{gap:9px;font-size:11px}.brand{font-size:13px}#minimap{width:120px;height:80px}}
+
+/* Producer panel: fixed-size unit cards with category tabs and an independently scrollable list. */
+#side .panel:nth-child(2){min-height:0;flex:1;display:flex;flex-direction:column;overflow:hidden}
+#actions{min-height:0;min-width:0;overflow-y:auto;overflow-x:hidden;display:flex;flex-direction:column;gap:7px;padding-right:3px;overscroll-behavior:contain}
+.producer-tabs{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:5px;flex:0 0 auto}
+.producer-tabs button{padding:7px 3px;font-size:11px;white-space:nowrap}
+.producer-tabs button.active{background:#785a27;border-color:#c99b45;color:#fff}
+.producer-list{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:7px;min-height:0;overflow-y:auto;overflow-x:hidden;padding:1px 3px 5px 1px;align-content:start;overscroll-behavior:contain}
+.producer-card{min-width:0;border:1px solid #405563;border-radius:7px;background:#1d2d38;padding:7px;display:flex;flex-direction:column;gap:5px}
+.producer-card strong{font-size:12px;line-height:1.35;overflow-wrap:anywhere}
+.producer-card .producer-cost{font-size:11px;color:#aebdc5;min-height:16px}
+.producer-card button{width:100%;padding:7px 4px;font-size:11px;white-space:normal;line-height:1.3}
+.producer-card .producer-upgrade{font-size:10px;padding:5px 3px}
+@media(max-width:760px){#side .panel:nth-child(2){grid-column:1/-1}#actions{max-height:100%}.producer-list{grid-template-columns:repeat(2,minmax(0,1fr))}}
 </style>
 </head>
 <body>
@@ -240,12 +254,39 @@ function renderActions(){
 var b=selected.length===1?selected[0]:null,html='';
 function addDismantleButton(group){var eligible=group.filter(o=>o&&o.team==='p'&&o.kind==='building'&&!['hq','wonder'].includes(o.type));var label=group.length===1?'拆除建築（返還 50% 資源）':'拆除可拆除建築（'+eligible.length+'/'+group.length+' 座，返還 50%）';btn(label,function(){dismantleBuildings(eligible)},eligible.length===0)}
 function btn(label,fn,disabled){var el=document.createElement('button');el.textContent=label;el.disabled=!!disabled;el.onclick=fn;ui.actions.appendChild(el)}
-function renderMultiProducerGroup(group){var type=group[0].type,roster=factionRosters[teamRaces.p]||factionRosters.engineers,types=type==='barracks'?(roster.barracks||[]):(roster.factory||[]);var info=document.createElement('div');info.className='hint';info.textContent='已選取 '+group.length+' 座'+buildingName(type,'p')+'；以下生產與持續生產指令會同步套用至全部建築。';ui.actions.appendChild(info);var counts=group.map(b=>b.queue.length);var q=document.createElement('div');q.className='muted';q.textContent='各建築狀態：'+group.map((b,i)=>{var r=b.rallyOrder,where=!r?'未設集結':r.type==='attack'?'攻擊目標':r.type==='gather'?'採集目標':'地面座標';return '第'+(i+1)+'座 佇列'+counts[i]+'項／'+where}).join('；');ui.actions.appendChild(q);types.filter(k=>defs[k]&&eras.p>=minEraForUnit(k)).forEach(k=>{var active=group.every(b=>b.repeatType===k);btn('全部加入佇列：'+unitName(k,'p')+' × '+group.length+'（'+costText(defs[k].cost)+'／座）',function(){var done=0;group.forEach(b=>{var before=b.queue.length;train(b,k);if(b.queue.length>before)done++});if(done<group.length)log('已成功加入 '+done+'/'+group.length+' 座建築；其餘可能因資源或人口不足而未加入。');updateUI()},!group.some(b=>canQueueUnit(b,k))||!canPay(Object.keys(defs[k].cost).reduce((a,key)=>(a[key]=defs[k].cost[key]*group.length,a),{})));btn(active?'全部停止持續生產：'+unitName(k,'p'):'全部持續生產：'+unitName(k,'p'),function(){var enable=!active;group.forEach(b=>b.repeatType=enable?k:(b.repeatType===k?null:b.repeatType));log(enable?'已對全部 '+group.length+' 座建築設定持續生產：'+unitName(k,'p'):'已停止全部建築的此兵種持續生產。');updateUI()})});if(type==='barracks'||type==='factory'){var first=group[0];(type==='barracks'?(roster.barracks||[]):(roster.factory||[])).filter(k=>eras.p>=minEraForUnit(k)).forEach(k=>renderUnitUpgradeControl(first,k,btn))}}
+function producerCategory(k){var d=defs[k]||{};if(d.kind==='artillery')return '攻城';if(d.kind==='vehicle')return '機動';if(d.kind==='support')return '支援';return '步兵'}
+function renderProducerCatalog(group,type,multi){
+ var roster=factionRosters[teamRaces.p]||factionRosters.engineers;
+ var types=(type==='barracks'?(roster.barracks||[]):(roster.factory||[])).filter(k=>defs[k]&&eras.p>=minEraForUnit(k));
+ var categories=['全部','步兵','機動','攻城','支援'];
+ var tabs=document.createElement('div');tabs.className='producer-tabs';
+ var list=document.createElement('div');list.className='producer-list';
+ var active='全部';
+ function renderList(){list.replaceChildren();var shown=types.filter(k=>active==='全部'||producerCategory(k)===active);
+  if(!shown.length){var empty=document.createElement('div');empty.className='muted';empty.textContent='此分類目前沒有可生產兵種。';empty.style.gridColumn='1/-1';list.appendChild(empty);return}
+  shown.forEach(function(k){var d=defs[k],card=document.createElement('div');card.className='producer-card';
+   var name=document.createElement('strong');name.textContent=unitName(k,'p');card.appendChild(name);
+   var cost=document.createElement('div');cost.className='producer-cost';cost.textContent=costText(d.cost)+'｜人口 '+d.pop;card.appendChild(cost);
+   var queue=document.createElement('button');queue.textContent=multi?'全部加入佇列 × '+group.length:'加入佇列';
+   queue.disabled=multi?(!group.some(b=>canQueueUnit(b,k))||!canPay(Object.keys(d.cost).reduce((a,key)=>(a[key]=d.cost[key]*group.length,a),{}))):(!canPay(d.cost)||!canQueueUnit(group[0],k));
+   queue.onclick=function(){if(multi){var done=0;group.forEach(function(b){var before=b.queue.length;train(b,k);if(b.queue.length>before)done++});if(done<group.length)log('已成功加入 '+done+'/'+group.length+' 座建築；其餘可能因資源或人口不足而未加入。')}else train(group[0],k);updateUI()};card.appendChild(queue);
+   var repeat=multi?group.every(b=>b.repeatType===k):group[0].repeatType===k;
+   var repeatBtn=document.createElement('button');repeatBtn.textContent=repeat?'停止持續生產':'持續生產';
+   repeatBtn.onclick=function(){if(multi){var enable=!repeat;group.forEach(b=>b.repeatType=enable?k:(b.repeatType===k?null:b.repeatType));log(enable?'已對全部 '+group.length+' 座建築設定持續生產：'+unitName(k,'p'):'已停止全部建築的此兵種持續生產。')}else{var b=group[0];b.repeatType=b.repeatType===k?null:k;log(b.repeatType?'已設定持續生產：'+unitName(k,'p'):'已停止持續生產。')}updateUI()};card.appendChild(repeatBtn);
+   var up=document.createElement('div');up.className='producer-upgrade';
+   var upgradeBtn=document.createElement('button');upgradeBtn.className='producer-upgrade';
+   renderUnitUpgradeControl(group[0],k,function(label,fn,disabled){upgradeBtn.textContent=label;upgradeBtn.onclick=fn;upgradeBtn.disabled=!!disabled});
+   card.appendChild(upgradeBtn);list.appendChild(card);
+  });
+ }
+ categories.forEach(function(cat){var tab=document.createElement('button');tab.textContent=cat;tab.className=cat===active?'active':'';tab.onclick=function(){active=cat;Array.from(tabs.children).forEach(function(el){el.classList.toggle('active',el.textContent===cat)});renderList()};tabs.appendChild(tab)});
+ ui.actions.appendChild(tabs);ui.actions.appendChild(list);renderList();
+}
 
 ui.actions.innerHTML='';
 if(b&&b.kind==='neutralSite'){var ownerName=({p:'藍方（你）',e:'紅方 AI',n:'紫方 AI',s:'金方 AI'})[b.owner]||'中立';var note=document.createElement('div');note.className='hint';note.textContent=b.name+'｜目前控制：'+ownerName+'。'+(b.type==='supply'?'每秒提供肉、木材、金礦。':b.type==='arsenal'?'己方新生部隊攻擊力 +10%。':b.type==='sanctuary'?'己方新生部隊生命值 +10%。':'可招募特殊兵種「自由傭兵」。');ui.actions.appendChild(note);if(b.captureTeam){var prog=document.createElement('div');prog.className='muted';prog.textContent='佔領進度：'+Math.floor(b.captureProgress)+'%';ui.actions.appendChild(prog)}if(b.owner==='p'&&b.type==='warcamp'){var q=document.createElement('div');q.className='muted';q.textContent=b.queue.length?'傭兵招募中：'+Math.ceil(b.queue[0].remain)+' 秒':'傭兵營地待命';ui.actions.appendChild(q);var md=defs.mercenary;btn('招募自由傭兵（'+costText(md.cost)+'）',function(){if(b.owner!=='p'||b.queue.length||!canPay(md.cost)||countPop('p')+teamQueuedPop('p')+md.pop>myCap())return;pay(md.cost);b.queue.push({type:'mercenary',remain:md.time});updateUI()},b.queue.length>0||!canPay(md.cost)||countPop('p')+teamQueuedPop('p')+md.pop>myCap())}return}
 if(placing){btn(placing==='wall'?(wallStart?'取消城牆終點':'取消城牆起點')+' [Esc':'取消建造 [Esc]',function(){placing=null;wallStart=null;renderActions()});if(placing==='wall'){var note=document.createElement('div');note.className='hint';note.textContent=wallStart?'再右鍵點擊終點，將自動連接城牆。':'右鍵點擊城牆起點。';ui.actions.appendChild(note)}return}
-if(selected.length>1&&selected.every(o=>o&&o.team==='p'&&o.kind==='building')){addDismantleButton(selected);var multiProducers=selected.every(o=>['barracks','factory'].includes(o.type))&&selected.every(o=>o.type===selected[0].type)?selected.slice():[];if(multiProducers.length){renderMultiProducerGroup(multiProducers);return}return}
+if(selected.length>1&&selected.every(o=>o&&o.team==='p'&&o.kind==='building')){addDismantleButton(selected);var multiProducers=selected.every(o=>['barracks','factory'].includes(o.type))&&selected.every(o=>o.type===selected[0].type)?selected.slice():[];if(multiProducers.length){renderProducerCatalog(multiProducers,selected[0].type,true);return}return}
 var multiProducers=[];
 if(b&&b.team==='p'&&b.kind==='unit'&&b.type==='worker'){
 var keyHint=document.createElement('div');keyHint.className='hint';keyHint.textContent='建築快捷鍵：1–0、Q/W/E、T 城牆；Esc 取消建造';ui.actions.appendChild(keyHint);
@@ -260,8 +301,8 @@ btn('取消生產集結指令',function(){b.rallyOrder=null;log('已取消此建
 }
 if(b.type==='hq'){var next=eras.p+1;if(next<=3){var ec=eraCost(next),req=next===1?'需要兵營＋第一階段世界奇觀':next===2?'需要戰車工廠、研究所＋第二階段世界奇觀':'需要研究所、補給中心＋第三階段世界奇觀';btn('文明躍進：'+eraNames[next]+'（'+costText(ec)+'）',function(){if(advanceEra('p'))updateUI();else log('升級條件不足：'+req+'，或資源不足。')},!canAdvance('p',next)||!canPay(ec))}}
 if(b.type==='hq'){btn('加入佇列：'+unitName('worker','p')+' '+costText(defs.worker.cost),function(){train(b,'worker')},!canPay(defs.worker.cost)||!canQueueUnit(b,'worker'));btn(b.repeatType==='worker'?'停止持續生產平民':'持續生產平民',function(){b.repeatType=b.repeatType==='worker'?null:'worker';log(b.repeatType?'已設定持續生產平民。':'已停止持續生產。');updateUI()});}
-if(b.type==='barracks'){(factionRosters[teamRaces.p]||factionRosters.engineers).barracks.filter(k=>eras.p>=minEraForUnit(k)).forEach(k=>{btn('加入佇列：'+unitName(k,'p')+' '+costText(defs[k].cost),function(){train(b,k)},!canPay(defs[k].cost)||!canQueueUnit(b,k));btn(b.repeatType===k?'停止持續生產':'持續生產此兵種',function(){b.repeatType=b.repeatType===k?null:k;log(b.repeatType?'已設定持續生產：'+unitName(k,'p'):'已停止持續生產。');updateUI()});renderUnitUpgradeControl(b,k,btn)})}if(b.type==='fort'){btn('設為部隊集結點',function(){rallyPoints.p={x:b.x,y:b.y};log('部隊集結點已設為此堡壘');updateUI()});btn('清除集結點',function(){rallyPoints.p=null;log('已清除前線集結點');updateUI()},!rallyPoints.p)}
-if(b.type==='factory'){(factionRosters[teamRaces.p]||factionRosters.engineers).factory.filter(k=>eras.p>=minEraForUnit(k)).forEach(k=>{btn('加入佇列：'+unitName(k,'p')+' '+costText(defs[k].cost),function(){train(b,k)},!canPay(defs[k].cost)||!canQueueUnit(b,k));btn(b.repeatType===k?'停止持續生產':'持續生產此兵種',function(){b.repeatType=b.repeatType===k?null:k;log(b.repeatType?'已設定持續生產：'+unitName(k,'p'):'已停止持續生產。');updateUI()});renderUnitUpgradeControl(b,k,btn)})}
+if(b.type==='barracks'){renderProducerCatalog([b],'barracks',false)}if(b.type==='fort'){btn('設為部隊集結點',function(){rallyPoints.p={x:b.x,y:b.y};log('部隊集結點已設為此堡壘');updateUI()});btn('清除集結點',function(){rallyPoints.p=null;log('已清除前線集結點');updateUI()},!rallyPoints.p)}
+if(b.type==='factory'){renderProducerCatalog([b],'factory',false)}
 if(b.type==='wonder'){var wl=wonderLevels.p;if(wonderChosen.p<wl){btn('軍事文明：全兵種攻擊 +15%',function(){grantWonderBuff('p','military');updateUI()});btn('經濟文明：全資源採集 +25%',function(){grantWonderBuff('p','economy');updateUI()});var pending=wl-wonderChosen.p;var wait=document.createElement('div');wait.className='muted';wait.textContent='尚有 '+pending+' 次文明加成未選擇；完成選擇後才能升級奇觀。';ui.actions.appendChild(wait)}if(wl<3){var nl=wl+1,wc=wonderUpgradeCost(nl),req=nl===2?'需先進入封建時代，並建造戰車工廠、科技研究所':nl===3?'需先進入帝國時代，並建造科技研究所、補給中心':'需先建造兵營';var ready=canWonderUpgrade('p',nl)&&wonderChosen.p>=wl;btn('升級世界奇觀至第 '+nl+' 階（'+costText(wc)+'）',function(){if(wonderChosen.p<wl){log('請先選擇目前階段的文明加成，再升級世界奇觀。');return}if(!canWonderUpgrade('p',nl)){log('升級條件不足：'+req+'。');return}if(!pay(wc)){log('世界奇觀升級資源不足：需要 '+costText(wc)+'。');return}wonderLevels.p=nl;b.level=nl;b.max+=500;b.hp=Math.min(b.max,b.hp+500);log('世界奇觀升級完成！請選擇文明加成。');updateUI()},!ready||!canPay(wc));var status=document.createElement('div');status.className='muted';status.textContent='升級條件：'+req+'；資源需求：'+costText(wc)+'。';ui.actions.appendChild(status)}}
 if(b.type==='lab'){
   var race=teamRaces.p||'engineers';
